@@ -126,35 +126,55 @@
     }
 
     /* ── Quick Action Buttons ── */
-    .quick-actions {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin: 28px 0 0;
+    .quick-sections {
       width: 100%;
       max-width: 600px;
+      margin: 20px 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
     }
 
-    .quick-btn {
+    .quick-section-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+      text-align: left;
+    }
+
+    .quick-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .quick-chip {
       background: var(--surface2);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 12px;
+      border-radius: 20px;
+      padding: 6px 13px;
       cursor: pointer;
-      transition: all 0.2s;
-      text-align: left;
+      font-size: 0.78rem;
       color: var(--text);
+      transition: all 0.15s;
+      white-space: nowrap;
     }
 
-    .quick-btn:hover {
+    .quick-chip:hover {
       border-color: var(--primary);
-      background: rgba(91, 106, 245, 0.08);
-      transform: translateY(-2px);
+      background: rgba(91, 106, 245, 0.1);
+      color: var(--primary);
     }
 
-    .quick-btn .btn-icon { font-size: 1.3rem; margin-bottom: 6px; display: block; }
-    .quick-btn .btn-label { font-size: 0.78rem; font-weight: 600; display: block; }
-    .quick-btn .btn-desc { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; display: block; }
+    .quick-chip.member-chip {
+      border-color: rgba(91,106,245,0.35);
+    }
+
+    /* 하위호환용 (동적 suggestions에서 사용) */
+    .quick-btn { display: none; }
+    .quick-btn .btn-icon, .quick-btn .btn-label, .quick-btn .btn-desc { display: none; }
 
     /* ── Messages ── */
     .messages { display: flex; flex-direction: column; gap: 16px; }
@@ -504,10 +524,7 @@
       .welcome { padding: 16px 10px; }
       .welcome h2 { font-size: 1rem; }
       .welcome p  { font-size: 0.78rem; }
-      .quick-actions { grid-template-columns: repeat(2, 1fr); gap: 7px; }
-      .quick-btn { padding: 10px 6px; }
-      .quick-btn .btn-icon  { font-size: 1.1rem; }
-      .quick-btn .btn-label { font-size: 0.72rem; }
+      .quick-chip { font-size: 0.74rem; padding: 5px 11px; }
       .quick-btn .btn-desc  { display: none; }
 
       /* 입력 영역 */
@@ -555,8 +572,32 @@
     <p>SHALAC 라크로스 동아리의 AI 어시스턴트예요.<br>
     아래 버튼을 누르거나 직접 물어보세요!</p>
 
-    <div class="quick-actions" id="quickActions">
-      <!-- 동적으로 로드됨 -->
+    <div class="quick-sections" id="quickSections">
+      <!-- 부원용 메뉴 -->
+      <div>
+        <div class="quick-section-label">📋 부원 메뉴</div>
+        <div class="quick-chips">
+          <button class="quick-chip member-chip" onclick="sendQuickMessage('훈련 내용을 기록하고 싶어요')">🏃 훈련 기록</button>
+          <button class="quick-chip member-chip" onclick="sendQuickMessage('예산 사용내역을 기록할게요')">💰 예산 기록</button>
+          <button class="quick-chip member-chip" onclick="sendQuickMessage('장비 대여 기록을 하고 싶어요')">🏒 장비 대여</button>
+        </div>
+      </div>
+      <!-- 일반용 메뉴 -->
+      <div>
+        <div class="quick-section-label">🌐 일반 메뉴</div>
+        <div class="quick-chips">
+          <button class="quick-chip" onclick="sendQuickMessage('라크로스가 뭐야? 간단히 설명해줘')">🥍 라크로스란?</button>
+          <button class="quick-chip" onclick="sendQuickMessage('샤락의 기본 정보를 알려줘')">📌 샤락 기본정보</button>
+          <button class="quick-chip" onclick="sendQuickMessage('게스트 참여 신청을 하고 싶어요')">🙋 게스트 신청</button>
+        </div>
+      </div>
+      <!-- 자주 사용한 메뉴 -->
+      <div>
+        <div class="quick-section-label">🔥 자주 찾는 메뉴</div>
+        <div class="quick-chips" id="trendingChips">
+          <!-- 동적 로드 -->
+        </div>
+      </div>
     </div>
   </div>
 
@@ -739,30 +780,21 @@
     sendMessage();
   }
 
-  // ── 인기 검색어 버튼 로드 ────────────────────────────────────────────────────
-  const QUICK_ICONS = ['🔥','💬','📋','💰','🏒','🎪','📸','🌤️','🙋','📊'];
+  // ── 자주 찾는 메뉴 로드 ─────────────────────────────────────────────────────
   async function loadSuggestions() {
-    const container = document.getElementById('quickActions');
+    const container = document.getElementById('trendingChips');
+    const defaults = ['날씨 어때?', '훈련 출석 순위', '라크로스 반칙 규정', '예산 현황', '최근 훈련 내용'];
     try {
       const res = await fetch('/api/suggestions');
       const { suggestions } = await res.json();
-      container.innerHTML = suggestions.map((text, i) => `
-        <button class="quick-btn" onclick="sendQuickMessage(${JSON.stringify(text)})">
-          <span class="btn-icon">${QUICK_ICONS[i % QUICK_ICONS.length]}</span>
-          <span class="btn-label">${text.length > 14 ? text.slice(0, 13) + '…' : text}</span>
-          <span class="btn-desc">${text}</span>
-        </button>
-      `).join('');
+      const chips = suggestions.slice(0, 5);
+      container.innerHTML = chips.map(text =>
+        `<button class="quick-chip" onclick="sendQuickMessage(${JSON.stringify(text)})">${text.length > 16 ? text.slice(0, 15) + '…' : text}</button>`
+      ).join('');
     } catch {
-      // 실패 시 기본값
-      container.innerHTML = `
-        <button class="quick-btn" onclick="sendQuickMessage('게스트 신청을 하고 싶어요')"><span class="btn-icon">🙋</span><span class="btn-label">게스트 신청</span><span class="btn-desc">훈련 참여 신청</span></button>
-        <button class="quick-btn" onclick="sendQuickMessage('훈련 내용을 기록하고 싶어요')"><span class="btn-icon">📋</span><span class="btn-label">훈련 기록</span><span class="btn-desc">일자·내용 기록</span></button>
-        <button class="quick-btn" onclick="sendQuickMessage('예산 사용내역을 기록할게요')"><span class="btn-icon">💰</span><span class="btn-label">예산 기록</span><span class="btn-desc">사용내역 입력</span></button>
-        <button class="quick-btn" onclick="sendQuickMessage('장비 대여 기록을 하고 싶어요')"><span class="btn-icon">🏒</span><span class="btn-label">장비 대여</span><span class="btn-desc">스틱·볼 대여</span></button>
-        <button class="quick-btn" onclick="sendQuickMessage('인스타그램 홍보글을 작성해줘')"><span class="btn-icon">📸</span><span class="btn-label">홍보글 작성</span><span class="btn-desc">인스타 캡션</span></button>
-        <button class="quick-btn" onclick="sendQuickMessage('동아리소개제 준비를 도와줘')"><span class="btn-icon">🎪</span><span class="btn-label">소개제 준비</span><span class="btn-desc">행사 기획 도움</span></button>
-      `;
+      container.innerHTML = defaults.map(text =>
+        `<button class="quick-chip" onclick="sendQuickMessage(${JSON.stringify(text)})">${text}</button>`
+      ).join('');
     }
   }
   loadSuggestions();
