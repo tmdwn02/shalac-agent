@@ -542,6 +542,7 @@
   <button class="auth-badge" id="authBadge" onclick="openPasswordModal()">
     🔓 게스트
   </button>
+  <button onclick="clearSession()" style="background:none;border:none;color:var(--text-muted);font-size:0.75rem;cursor:pointer;padding:4px 8px;margin-left:4px;" title="대화 초기화">🗑️</button>
 </header>
 
 <!-- Chat Area -->
@@ -636,6 +637,43 @@
   const userInputEl = document.getElementById('userInput');
   const sendBtn = document.getElementById('sendBtn');
 
+  // ── localStorage 저장/복원 ──────────────────────────────────────────────────
+  function clearSession() {
+    if (!confirm('대화 내역과 로그인 상태를 초기화할까요?')) return;
+    localStorage.removeItem('shalac_auth');
+    localStorage.removeItem('shalac_history');
+    location.reload();
+  }
+
+  function saveSession() {
+    try {
+      localStorage.setItem('shalac_auth', JSON.stringify({ authLevel, memberPassword }));
+      // 최근 30개 메시지만 저장
+      localStorage.setItem('shalac_history', JSON.stringify(conversationHistory.slice(-30)));
+    } catch(e) {}
+  }
+
+  function restoreSession() {
+    try {
+      const auth = JSON.parse(localStorage.getItem('shalac_auth') || '{}');
+      if (auth.authLevel === 'member' && auth.memberPassword) {
+        authLevel = 'member';
+        memberPassword = auth.memberPassword;
+        updateAuthBadge();
+      }
+      const history = JSON.parse(localStorage.getItem('shalac_history') || '[]');
+      if (history.length > 0) {
+        conversationHistory = history;
+        welcomeEl.style.display = 'none';
+        history.forEach(msg => {
+          if (msg.role === 'user' || msg.role === 'assistant') {
+            appendMessage(msg.role === 'user' ? 'user' : 'bot', msg.content);
+          }
+        });
+      }
+    } catch(e) {}
+  }
+
   // ── 파일 선택 처리 ──────────────────────────────────────────────────────────
   function handleFileSelect(file) {
     if (!file) return;
@@ -728,6 +766,7 @@
     }
   }
   loadSuggestions();
+  restoreSession();
 
   // ── 메시지 전송 ──────────────────────────────────────────────────────────────
   async function sendMessage() {
@@ -839,6 +878,7 @@
         conversationHistory.push({ role: 'assistant', content: data.reply });
         authLevel = data.authLevel;
         updateAuthBadge();
+        saveSession();
 
         // 봇이 인증을 요구하는 답변을 했으면 자동으로 비밀번호 모달 띄우기
         if (authLevel !== 'member') {
@@ -1128,6 +1168,7 @@
         memberPassword = pw;
         authLevel = 'member';
         updateAuthBadge();
+        saveSession();
         const cb = _modalCallback;
         closePasswordModal();
         if (welcomeEl.style.display !== 'none') welcomeEl.style.display = 'none';
