@@ -895,6 +895,7 @@ async function runNotificationAgent(event, data) {
 - budget_alert: 잔액이 30만원 미만이면 알림
 - training_missing: 7일 이상 기록 없으면 알림
 - training_record: 알림 불필요 (캘린더 등록으로 충분)
+- exam_vote_reminder: 항상 알림 (시험기간 투표 진행 요청)
 
 반드시 아래 JSON 형식으로만 답하세요:
 {"send": true/false, "subject": "제목", "body": "내용"}`,
@@ -2034,7 +2035,33 @@ cron.schedule('0 23 28-31 * *', async () => {
   }
 }, { timezone: 'Asia/Seoul' });
 
-console.log('🔔 선제적 알림 스케줄 등록됨 (매일 오전 9시 / 매월 말일 오후 11시)');
+// 시험기간 투표 알림 (4월 1주 월요일, 5월 3주 월요일, 9월 1주 월요일, 11월 3주 월요일 오전 9시)
+// 크론: 매주 월요일 오전 9시에 실행 → 날짜 조건 체크
+cron.schedule('0 9 * * 1', async () => {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const month = now.getMonth() + 1; // 1~12
+  const day = now.getDate();
+  const week = Math.ceil(day / 7); // 몇째 주인지
+
+  const targets = [
+    { month: 4,  week: 1, label: '1학기 중간고사' },
+    { month: 5,  week: 3, label: '1학기 기말고사' },
+    { month: 9,  week: 1, label: '2학기 중간고사' },
+    { month: 11, week: 3, label: '2학기 기말고사' },
+  ];
+
+  const matched = targets.find(t => t.month === month && t.week === week);
+  if (matched) {
+    console.log(`📅 시험기간 투표 알림 발송: ${matched.label}`);
+    await runNotificationAgent('exam_vote_reminder', {
+      examName: matched.label,
+      month,
+      week,
+    });
+  }
+}, { timezone: 'Asia/Seoul' });
+
+console.log('🔔 선제적 알림 스케줄 등록됨 (매일 오전 9시 / 매월 말일 오후 11시 / 시험기간 투표 알림)');
 
 app.listen(PORT, async () => {
   console.log(`🥍 샤락 에이전트 서버 실행 중: http://localhost:${PORT}`);
