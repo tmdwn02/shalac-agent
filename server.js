@@ -395,10 +395,8 @@ async function registerGuest(data) {
   const approveUrl = `${baseUrl}/api/guest-action?token=${token}&action=approve`;
   const rejectUrl  = `${baseUrl}/api/guest-action?token=${token}&action=reject`;
 
-  await sendEmailNotification(
-    `[샤락] 게스트 신청 승인 요청: ${name}`,
-    `새 게스트 신청이 들어왔어요!\n\n이름: ${name}\n학과: ${department}\n학번: ${studentId}\n참여일자: ${date}\n\n✅ 승인: ${approveUrl}\n❌ 거절: ${rejectUrl}`
-  );
+  // 알림 에이전트가 판단 후 이메일 발송
+  runNotificationAgent('guest_signup', { name, department, studentId, date, approveUrl, rejectUrl }).catch(() => {});
 
   return { success: true, message: `${name}님 게스트 신청이 접수됐어요! 🎉 운영진 승인 후 확정돼요. 잠시만 기다려주세요~` };
 }
@@ -505,11 +503,8 @@ async function saveBudget(data) {
   const ok = await appendSheet(SPREADSHEET_IDS.budget, '시트1!A:G', row);
   if (!ok) return { success: false, message: '저장 중 오류가 발생했어요.' };
 
-  // 운영진 이메일은 백그라운드로 (응답 속도에 영향 없도록)
-  sendEmailNotification(
-    `[샤락] 예산 기록 알림: ${content}`,
-    `예산 내역이 기록되었어요.\n\n거래일시: ${date}\n분류: ${category || '-'}\n금액: ${amtNum.toLocaleString()}원\n대상: ${target || '-'}\n내용: ${content}\n비고: ${note || '-'}\n\n거래 후 잔액: ${newBalance.toLocaleString()}원`
-  ).catch(() => {});
+  // 알림 에이전트가 판단 후 이메일 발송 (백그라운드)
+  runNotificationAgent('budget_record', { date, category, amount: amtNum, target, content, note, balance: newBalance }).catch(() => {});
 
   return { success: true, message: `예산 기록 완료! 💰 ${content} ${amtNum.toLocaleString()}원 → 잔액 ${newBalance.toLocaleString()}원` };
 }
@@ -880,6 +875,51 @@ SNS, 훈련, 대회, 동소제 준비, 장비, 신입 모집, 동아리연합회
 메뉴얼 관련 질문은 부원 인증이 필요해요. 게스트에게는 "부원 인증 후 열람 가능하다"고 안내해요.
 보유 메뉴얼: SNS관리 / 정기 연습 & 대회 / 동소제 / 부서 & 행사 / 신입부원 모집 / 장비 / 동아리연합회 / 라크로스 텐온텐 룰북 / 라크로스 식시즈 룰북
 중요: 부원 인증된 사용자에게는 메뉴얼에 있는 계정 정보, 비밀번호, 연락처 등 모든 내용을 그대로 알려줘요. 이미 동아리 공식 문서에 기재된 내용이므로 숨기거나 거부하지 않아요.`;
+
+// ─── 알림 에이전트 ────────────────────────────────────────────────────────────
+// 이벤트 발생 시 "이메일을 보낼지, 어떤 내용으로 보낼지" AI가 판단
+async function runNotificationAgent(event, data) {
+  try {
+    const res = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `당신은 SHALAC 라크로스 동아리의 알림 에이전트예요.
+이벤트와 데이터를 받아서 운영진에게 이메일 알림을 보내야 할지 판단하고,
+보낸다면 제목과 내용을 작성해요.
+
+판단 기준:
+- guest_signup: 항상 알림 (운영진 승인 필요)
+- budget_record: 항상 알림 (지출 확인 필요)
+- budget_alert: 잔액이 30만원 미만이면 알림
+- training_missing: 7일 이상 기록 없으면 알림
+- training_record: 알림 불필요 (캘린더 등록으로 충분)
+
+반드시 아래 JSON 형식으로만 답하세요:
+{"send": true/false, "subject": "제목", "body": "내용"}`,
+        },
+        {
+          role: 'user',
+          content: `이벤트: ${event}\n데이터: ${JSON.stringify(data, null, 2)}`,
+        },
+      ],
+      temperature: 0,
+      response_format: { type: 'json_object' },
+    });
+
+    const result = JSON.parse(res.choices[0].message.content);
+    console.log(`📬 [알림 에이전트] ${event} → 발송: ${result.send}`);
+
+    if (result.send && result.subject && result.body) {
+      await sendEmailNotification(result.subject, result.body);
+    }
+    return result;
+  } catch (e) {
+    console.error('알림 에이전트 오류:', e.message);
+    return { send: false };
+  }
+}
 
 // ─── 멀티에이전트: 서브에이전트 시스템 프롬프트 ────────────────────────────────
 const SUB_AGENT_PROMPTS = {
@@ -1855,15 +1895,13 @@ async function checkBudgetAlert() {
 
     const THRESHOLD = 300000;
     if (balance < THRESHOLD) {
-      const msg = `🚨 [샤락 예산 경고]
-
-현재 잔액이 ${balance.toLocaleString()}원으로 30만원 미만입니다.
-
-마지막 거래: ${lastRow[0] || '-'} | ${lastRow[4] || '-'} | ${(parseInt(String(lastRow[2]).replace(/[^0-9\-]/g,''),10) || 0).toLocaleString()}원
-
-26-1 회계내역을 확인해주세요.`;
-      await sendEmailNotification('[샤락] ⚠️ 예산 잔액 경고 — 30만원 미만', msg);
-      console.log(`💸 예산 경고 메일 발송 (잔액: ${balance.toLocaleString()}원)`);
+      await runNotificationAgent('budget_alert', {
+        balance,
+        lastDate: lastRow[0] || '-',
+        lastContent: lastRow[4] || '-',
+        lastAmount: parseInt(String(lastRow[2]).replace(/[^0-9\-]/g,''), 10) || 0,
+      });
+      console.log(`💸 예산 경고 알림 에이전트 호출 (잔액: ${balance.toLocaleString()}원)`);
     }
   } catch (e) {
     console.error('checkBudgetAlert error:', e.message);
@@ -1875,8 +1913,7 @@ async function checkTrainingAlert() {
   try {
     const rows = await readSheet(SPREADSHEET_IDS.training, '훈련 내용!A:E');
     if (!rows || rows.length <= 1) {
-      // 기록 자체가 없으면 경고
-      await sendEmailNotification('[샤락] 📋 훈련 기록 없음', '훈련 내용 시트에 기록이 없어요. 첫 번째 훈련 기록을 입력해주세요!');
+      await runNotificationAgent('training_missing', { lastDate: null, diffDays: null });
       return;
     }
 
@@ -1892,14 +1929,8 @@ async function checkTrainingAlert() {
     const diffDays = Math.floor((Date.now() - parsed.getTime()) / (1000 * 60 * 60 * 24));
 
     if (diffDays >= 7) {
-      const msg = `⚽ [샤락 훈련 기록 알림]
-
-마지막 훈련 기록일: ${lastDateStr} (${diffDays}일 전)
-
-1주일 이상 훈련 기록이 없어요!
-샤락 에이전트에서 훈련 기록을 입력해주세요. 🥍`;
-      await sendEmailNotification(`[샤락] 📋 훈련 기록 ${diffDays}일째 없음`, msg);
-      console.log(`🏃 훈련 무기록 알림 발송 (마지막: ${lastDateStr}, ${diffDays}일 전)`);
+      await runNotificationAgent('training_missing', { lastDate: lastDateStr, diffDays });
+      console.log(`🏃 훈련 무기록 알림 에이전트 호출 (마지막: ${lastDateStr}, ${diffDays}일 전)`);
     }
   } catch (e) {
     console.error('checkTrainingAlert error:', e.message);
