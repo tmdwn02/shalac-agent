@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHALAC Agent — 아키텍처 다이어그램</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+    letter-spacing: -0.3px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 48px;
+  }
+
+  .diagram {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* ── 레이어 공통 ── */
+  .layer {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    position: relative;
+  }
+
+  .layer-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0 6px;
+    min-width: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .layer-content {
+    flex: 1;
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  /* ── 화살표 연결부 ── */
+  .arrow-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 36px;
+    gap: 4px;
+    position: relative;
+  }
+  .arrow-row .arrow-line {
+    width: 2px;
+    height: 24px;
+    background: linear-gradient(to bottom, #334155, #475569);
+    margin: 0 auto;
+  }
+  .arrow-row .arrow-head {
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid #475569;
+    margin: 0 auto;
+  }
+  .arrow-row .arrow-label {
+    position: absolute;
+    right: calc(50% - 120px);
+    font-size: 11px;
+    color: #64748b;
+    white-space: nowrap;
+  }
+
+  /* ── 박스 ── */
+  .box {
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 1;
+    min-width: 0;
+  }
+  .box-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: -0.1px;
+  }
+  .box-desc {
+    font-size: 11px;
+    line-height: 1.5;
+    opacity: 0.75;
+  }
+  .box-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+  }
+  .tag {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* ── 색상 테마 ── */
+  /* 클라이언트 */
+  .layer-client .layer-content { background: #1e293b; border: 1px solid #334155; }
+  .box-client { background: #0f172a; border: 1px solid #1e3a5f; }
+  .box-client .box-title { color: #60a5fa; }
+  .tag-client { background: #1e3a5f; color: #93c5fd; }
+
+  /* 하네스 */
+  .layer-harness .layer-content { background: #1a1a2e; border: 1px solid #3730a3; }
+  .box-harness { background: #0f0f1f; border: 1px solid #3730a3; }
+  .box-harness .box-title { color: #818cf8; }
+  .tag-harness { background: #1e1b4b; color: #a5b4fc; }
+
+  /* 오케스트레이터 */
+  .layer-orch .layer-content { background: #1c1917; border: 1px solid #78350f; }
+  .box-orch { background: #0c0a09; border: 1px solid #92400e; }
+  .box-orch .box-title { color: #fbbf24; }
+  .tag-orch { background: #292524; color: #fcd34d; }
+
+  /* 서브에이전트 */
+  .layer-agents .layer-content { background: #0f1f18; border: 1px solid #065f46; }
+  .box-ops { background: #052e16; border: 1px solid #166534; }
+  .box-ops .box-title { color: #4ade80; }
+  .tag-ops { background: #14532d; color: #86efac; }
+
+  .box-know { background: #1e1b4b; border: 1px solid #3730a3; }
+  .box-know .box-title { color: #a78bfa; }
+  .tag-know { background: #1e1b4b; color: #c4b5fd; }
+
+  .box-analytics { background: #0c1a2e; border: 1px solid #1e40af; }
+  .box-analytics .box-title { color: #60a5fa; }
+  .tag-analytics { background: #1e3a5f; color: #93c5fd; }
+
+  .box-general { background: #1c1917; border: 1px solid #78350f; }
+  .box-general .box-title { color: #fb923c; }
+  .tag-general { background: #292524; color: #fdba74; }
+
+  /* 알림 에이전트 */
+  .layer-notify .layer-content { background: #1f0e0e; border: 1px solid #7f1d1d; }
+  .box-notify { background: #0f0505; border: 1px solid #991b1b; }
+  .box-notify .box-title { color: #f87171; }
+  .tag-notify { background: #450a0a; color: #fca5a5; }
+
+  /* 스킬 */
+  .layer-skills .layer-content { background: #0f1f18; border: 1px solid #134e4a; }
+  .box-skill { background: #042f2e; border: 1px solid #0f766e; }
+  .box-skill .box-title { color: #2dd4bf; }
+  .tag-skill { background: #134e4a; color: #99f6e4; }
+
+  /* 외부 연결 */
+  .layer-ext .layer-content { background: #1a1a1a; border: 1px solid #404040; }
+  .box-ext { background: #111; border: 1px solid #333; }
+  .box-ext .box-title { color: #94a3b8; }
+  .tag-ext { background: #1e293b; color: #94a3b8; }
+
+  /* ── 분기 화살표 ── */
+  .branch-arrows {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 60px;
+    height: 40px;
+    position: relative;
+  }
+  .branch-arrows::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    width: 1px; height: 14px;
+    background: #475569;
+    transform: translateX(-50%);
+  }
+  .branch-arrows::after {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: 12.5%;
+    right: 12.5%;
+    height: 1px;
+    background: #475569;
+  }
+  .branch-dot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .branch-dot .vline {
+    width: 1px; height: 16px;
+    background: #475569;
+    margin-top: 14px;
+  }
+  .branch-dot .ahead {
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid #475569;
+  }
+
+  /* ── 하단 범례 ── */
+  .legend {
+    max-width: 960px;
+    margin: 40px auto 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #94a3b8;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  /* ── 기준 10 뱃지 ── */
+  .criteria-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: #1e293b;
+    color: #64748b;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<h1>🥍 SHALAC Agent — 아키텍처 다이어그램</h1>
+<p class="subtitle">서울대학교 여자 라크로스 동아리 "샤락" AI 운영 에이전트 · 2026</p>
+
+<div class="diagram">
+
+  <!-- ① 클라이언트 레이어 -->
+  <div class="layer layer-client">
+    <div class="layer-label">CLIENT</div>
+    <div class="layer-content" style="flex-direction: column; gap: 10px;">
+      <div style="display: flex; gap: 10px;">
+        <div class="box box-client" style="flex: 2;">
+          <div class="box-title">브라우저 (index.html)</div>
+          <div class="box-desc">대화 UI · 파일 업로드 · 인증 레벨 분기</div>
+          <div class="box-tags">
+            <span class="tag tag-client">localStorage 세션 영속</span>
+            <span class="tag tag-client">에이전트 레이블 표시</span>
+            <span class="tag tag-client">동적 추천 칩</span>
+          </div>
+        </div>
+        <div class="box box-client" style="flex: 1;">
+          <div class="box-title">인증 레이어</div>
+          <div class="box-desc">guest / member 2단계</div>
+          <div class="box-tags">
+            <span class="tag tag-client">비밀번호 검증</span>
+            <span class="tag tag-client">기능 분기</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 화살표 -->
+  <div class="arrow-row">
+    <div style="display:flex; flex-direction:column; align-items:center;">
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+    </div>
+    <span class="arrow-label">HTTPS · POST /api/chat · multipart(영수증)</span>
+  </div>
+
+  <!-- ② 하네스 레이어 -->
+  <div class="layer layer-harness">
+    <div class="layer-label">HARNESS</div>
+    <div class="layer-content" style="flex-wrap: wrap; gap: 10px;">
+      <div class="box box-harness" style="flex: 1; min-width: 140px;">
+        <div class="box-title">실행 루프 관리</div>
+        <div class="box-desc">요청 수신 → 에이전트 선택 → 도구 실행 → 응답 반환</div>
+        <div class="box-tags"><span class="tag tag-harness">기준 10</span></div>
+      </div>
+      <div class="box box-harness" style="flex: 1; min-width: 140px;">
+        <div class="box-title">입출력 라우팅</div>
+        <div class="box-desc">/api/chat · /api/guest-action · /api/suggestions · /api/upload</div>
+        <div class="box-tags"><span class="tag tag-harness">multer</span></div>
+      </div>
+      <div class="box box-harness" style="flex: 1; min-width: 140px;">
+        <div class="box-title">에러·예외 처리</div>
+        <div class="box-desc">Google API 환경 분기 · Vision 폴백 · SMTP 타임아웃 격리</div>
+        <div class="box-tags"><span class="tag tag-harness">fire-and-forget</span></div>
+      </div>
+      <div class="box box-harness" style="flex: 1; min-width: 140px;">
+        <div class="box-title">스케줄 하네스</div>
+        <div class="box-desc">node-cron 매일 9시 · 매주 월 · 매월 말일</div>
+        <div class="box-tags"><span class="tag tag-harness">Asia/Seoul TZ</span></div>
+      </div>
+      <div class="box box-harness" style="flex: 1; min-width: 140px;">
+        <div class="box-title">Guardrails</div>
+        <div class="box-desc">authLevel 검증 · 여자부 기준 고정 · 토큰 1회성 소멸</div>
+        <div class="box-tags"><span class="tag tag-harness">안전 경계</span></div>
+      </div>
+      <div class="box box-harness" style="flex: 1; min-width: 140px;">
+        <div class="box-title">쿼리 로거</div>
+        <div class="box-desc">모든 질문 Sheets 누적 → 추천 칩 동적 반영</div>
+        <div class="box-tags"><span class="tag tag-harness">기준 07</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 화살표 -->
+  <div class="arrow-row">
+    <div style="display:flex; flex-direction:column; align-items:center;">
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+    </div>
+  </div>
+
+  <!-- ③ 오케스트레이터 -->
+  <div class="layer layer-orch">
+    <div class="layer-label">ORCH</div>
+    <div class="layer-content">
+      <div class="box box-orch" style="flex: 1;">
+        <div class="box-title">🎯 오케스트레이터 — classifyQuery()</div>
+        <div class="box-desc">GPT-4o-mini가 질문 유형을 분류 → 4개 서브 에이전트 중 1개 선택</div>
+        <div class="box-tags">
+          <span class="tag tag-orch">operations</span>
+          <span class="tag tag-orch">knowledge</span>
+          <span class="tag tag-orch">analytics</span>
+          <span class="tag tag-orch">general</span>
+          <span class="tag tag-orch">기준 04 멀티에이전트</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 분기 화살표 4개 -->
+  <div class="branch-arrows">
+    <div class="branch-dot"><div class="vline"></div><div class="ahead"></div></div>
+    <div class="branch-dot"><div class="vline"></div><div class="ahead"></div></div>
+    <div class="branch-dot"><div class="vline"></div><div class="ahead"></div></div>
+    <div class="branch-dot"><div class="vline"></div><div class="ahead"></div></div>
+  </div>
+
+  <!-- ④ 서브 에이전트 4개 -->
+  <div class="layer layer-agents">
+    <div class="layer-label">AGENTS</div>
+    <div class="layer-content">
+      <div class="box box-ops">
+        <div class="box-title">⚙️ 운영 에이전트</div>
+        <div class="box-desc">훈련·예산·장비·게스트 기록 전담</div>
+        <div class="box-tags">
+          <span class="tag tag-ops">record_training</span>
+          <span class="tag tag-ops">record_budget</span>
+          <span class="tag tag-ops">record_equipment</span>
+          <span class="tag tag-ops">register_guest</span>
+        </div>
+      </div>
+      <div class="box box-know">
+        <div class="box-title">📚 지식 에이전트</div>
+        <div class="box-desc">룰북·KLA대회·동아리 정보 전담</div>
+        <div class="box-tags">
+          <span class="tag tag-know">PDF 룰북 2종</span>
+          <span class="tag tag-know">여자부 기준 고정</span>
+          <span class="tag tag-know">KLA 크롤링</span>
+        </div>
+      </div>
+      <div class="box box-analytics">
+        <div class="box-title">📊 분석 에이전트</div>
+        <div class="box-desc">출석 통계·예산 분석 전담</div>
+        <div class="box-tags">
+          <span class="tag tag-analytics">training_stats</span>
+          <span class="tag tag-analytics">budget_summary</span>
+          <span class="tag tag-analytics">equipment_status</span>
+        </div>
+      </div>
+      <div class="box box-general">
+        <div class="box-title">💬 일반 에이전트</div>
+        <div class="box-desc">날씨·일반 질문 전담</div>
+        <div class="box-tags">
+          <span class="tag tag-general">기상청 API</span>
+          <span class="tag tag-general">동아리 소개</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 화살표 -->
+  <div class="arrow-row">
+    <div style="display:flex; flex-direction:column; align-items:center;">
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+    </div>
+    <span class="arrow-label">이벤트 발생 시 비동기 호출 →</span>
+  </div>
+
+  <!-- ⑤ 알림 에이전트 (비동기) -->
+  <div class="layer layer-notify">
+    <div class="layer-label">NOTIFY</div>
+    <div class="layer-content" style="flex-direction: column; gap: 10px;">
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <div class="box box-notify" style="flex: 2; min-width: 200px;">
+          <div class="box-title">🔔 알림 에이전트 — runNotificationAgent()</div>
+          <div class="box-desc">이벤트 + 데이터 수신 → GPT가 발송 여부·제목·본문 자체 판단 → Gmail 발송</div>
+          <div class="box-tags">
+            <span class="tag tag-notify">기준 08 휴먼개입</span>
+            <span class="tag tag-notify">비동기 독립 실행</span>
+          </div>
+        </div>
+        <div class="box box-notify" style="flex: 3; min-width: 280px;">
+          <div class="box-title">처리 이벤트 목록</div>
+          <div class="box-tags" style="margin-top: 4px;">
+            <span class="tag tag-notify">guest_signup → 운영진 승인 요청</span>
+            <span class="tag tag-notify">budget_record → 지출 확인</span>
+            <span class="tag tag-notify">budget_alert → 잔액 30만↓</span>
+            <span class="tag tag-notify">training_missing → 7일 공백</span>
+            <span class="tag tag-notify">exam_vote_reminder</span>
+            <span class="tag tag-notify">recruit_reminder</span>
+            <span class="tag tag-notify">semester_report</span>
+            <span class="tag tag-notify">new_tournament → KLA 신규 대회</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 화살표 -->
+  <div class="arrow-row">
+    <div style="display:flex; flex-direction:column; align-items:center;">
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+    </div>
+    <span class="arrow-label">function calling (tools)</span>
+  </div>
+
+  <!-- ⑥ 스킬 레이어 -->
+  <div class="layer layer-skills">
+    <div class="layer-label">SKILLS</div>
+    <div class="layer-content" style="flex-wrap: wrap; gap: 10px;">
+      <div class="box box-skill" style="flex: 1; min-width: 130px;">
+        <div class="box-title">record_training</div>
+        <div class="box-tags"><span class="tag tag-skill">Sheets 기록</span><span class="tag tag-skill">Calendar 등록</span></div>
+      </div>
+      <div class="box box-skill" style="flex: 1; min-width: 130px;">
+        <div class="box-title">record_budget</div>
+        <div class="box-tags"><span class="tag tag-skill">Vision OCR</span><span class="tag tag-skill">Drive 업로드</span></div>
+      </div>
+      <div class="box box-skill" style="flex: 1; min-width: 130px;">
+        <div class="box-title">register_guest</div>
+        <div class="box-tags"><span class="tag tag-skill">토큰 생성</span><span class="tag tag-skill">승인 이메일</span></div>
+      </div>
+      <div class="box box-skill" style="flex: 1; min-width: 130px;">
+        <div class="box-title">record_equipment</div>
+        <div class="box-tags"><span class="tag tag-skill">대여/반납 기록</span></div>
+      </div>
+      <div class="box box-skill" style="flex: 1; min-width: 130px;">
+        <div class="box-title">get_kla_tournament</div>
+        <div class="box-tags"><span class="tag tag-skill">크롤링</span><span class="tag tag-skill">순위·결과</span></div>
+      </div>
+      <div class="box box-skill" style="flex: 1; min-width: 130px;">
+        <div class="box-title">get_weather</div>
+        <div class="box-tags"><span class="tag tag-skill">기상청 API</span></div>
+      </div>
+      <div class="box box-skill" style="flex: 1; min-width: 130px;">
+        <div class="box-title">get_training_stats</div>
+        <div class="box-tags"><span class="tag tag-skill">출석률 집계</span></div>
+      </div>
+      <div class="box box-skill" style="flex: 1; min-width: 130px;">
+        <div class="box-title">get_budget_summary</div>
+        <div class="box-tags"><span class="tag tag-skill">카테고리 분석</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 화살표 -->
+  <div class="arrow-row">
+    <div style="display:flex; flex-direction:column; align-items:center;">
+      <div class="arrow-line"></div>
+      <div class="arrow-head"></div>
+    </div>
+  </div>
+
+  <!-- ⑦ 외부 연결 레이어 -->
+  <div class="layer layer-ext">
+    <div class="layer-label">TOOLS</div>
+    <div class="layer-content" style="flex-wrap: wrap; gap: 10px;">
+      <div class="box box-ext" style="flex: 1; min-width: 120px;">
+        <div class="box-title">Google Sheets</div>
+        <div class="box-desc">회원·훈련·예산·장비·게스트·쿼리 로그</div>
+        <div class="box-tags"><span class="tag tag-ext">API v4</span></div>
+      </div>
+      <div class="box box-ext" style="flex: 1; min-width: 120px;">
+        <div class="box-title">Google Drive</div>
+        <div class="box-desc">영수증 이미지 저장·공유</div>
+        <div class="box-tags"><span class="tag tag-ext">API v3</span></div>
+      </div>
+      <div class="box box-ext" style="flex: 1; min-width: 120px;">
+        <div class="box-title">Google Calendar</div>
+        <div class="box-desc">훈련 일정 자동 등록</div>
+        <div class="box-tags"><span class="tag tag-ext">API v3</span></div>
+      </div>
+      <div class="box box-ext" style="flex: 1; min-width: 120px;">
+        <div class="box-title">Gmail SMTP</div>
+        <div class="box-desc">알림·승인요청·리포트 발송</div>
+        <div class="box-tags"><span class="tag tag-ext">nodemailer</span><span class="tag tag-ext">587 TLS</span></div>
+      </div>
+      <div class="box box-ext" style="flex: 1; min-width: 120px;">
+        <div class="box-title">OpenAI</div>
+        <div class="box-desc">GPT-4o-mini · Vision API</div>
+        <div class="box-tags"><span class="tag tag-ext">function calling</span></div>
+      </div>
+      <div class="box box-ext" style="flex: 1; min-width: 120px;">
+        <div class="box-title">기상청 API</div>
+        <div class="box-desc">단기예보 (관악구)</div>
+        <div class="box-tags"><span class="tag tag-ext">KMA</span></div>
+      </div>
+      <div class="box box-ext" style="flex: 1; min-width: 120px;">
+        <div class="box-title">lacrosse.or.kr</div>
+        <div class="box-desc">KLA 대회 순위·결과 크롤링</div>
+        <div class="box-tags"><span class="tag tag-ext">HTML 파싱</span><span class="tag tag-ext">자동 감지</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 범례 -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#60a5fa;"></div>클라이언트 레이어</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#818cf8;"></div>하네스 (실행 환경)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;"></div>오케스트레이터</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4ade80;"></div>운영 에이전트</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#a78bfa;"></div>지식 에이전트</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#60a5fa;"></div>분석 에이전트</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fb923c;"></div>일반 에이전트</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f87171;"></div>알림 에이전트 (비동기)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2dd4bf;"></div>스킬 레이어</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#94a3b8;"></div>외부 도구 연결</div>
+</div>
+
+</body>
+</html>
