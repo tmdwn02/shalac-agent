@@ -11,6 +11,7 @@ const XLSX = require('xlsx');
 const multer = require('multer');
 const https = require('https');
 const http  = require('http');
+const pdfParse = require('pdf-parse');
 
 // multer: 메모리에 임시 저장 (디스크 저장 불필요)
 const upload = multer({
@@ -89,8 +90,31 @@ async function loadManuals() {
       docs[doc.name] = res.data.replace(/^﻿/, '').replace(/\n{3,}/g, '\n\n').trim();
       console.log(`✅ 메뉴얼 로드: ${doc.name} (${docs[doc.name].length}자)`);
     }
+    // ─── 로컬 manuals/ 폴더의 PDF/TXT 파일도 로드 ───────────────────────────
+    const manualsDir = path.join(__dirname, 'manuals');
+    if (fs.existsSync(manualsDir)) {
+      const files = fs.readdirSync(manualsDir);
+      for (const file of files) {
+        const filePath = path.join(manualsDir, file);
+        const name = path.basename(file, path.extname(file));
+        try {
+          if (file.endsWith('.pdf')) {
+            const buffer = fs.readFileSync(filePath);
+            const data = await pdfParse(buffer);
+            docs[name] = data.text.replace(/\n{3,}/g, '\n\n').trim();
+            console.log(`✅ PDF 메뉴얼 로드: ${name} (${docs[name].length}자)`);
+          } else if (file.endsWith('.txt')) {
+            docs[name] = fs.readFileSync(filePath, 'utf-8').replace(/\n{3,}/g, '\n\n').trim();
+            console.log(`✅ TXT 메뉴얼 로드: ${name} (${docs[name].length}자)`);
+          }
+        } catch (fileErr) {
+          console.error(`❌ 파일 로드 실패: ${file}`, fileErr.message);
+        }
+      }
+    }
+
     manualCache = docs;
-    console.log('📚 동아리 운영 메뉴얼 7개 로드 완료');
+    console.log(`📚 메뉴얼 총 ${Object.keys(docs).length}개 로드 완료`);
   } catch (e) {
     console.error('메뉴얼 로드 실패:', e.message);
   }
@@ -779,7 +803,7 @@ JSON으로 응답하지 말고, 자연스러운 대화로 응답해요.
 [동아리 운영 메뉴얼 — 부원 전용]
 SNS, 훈련, 대회, 동소제 준비, 장비, 신입 모집, 동아리연합회 등 운영 관련 질문이 오면 search_manual 툴을 사용해요.
 메뉴얼 관련 질문은 부원 인증이 필요해요. 게스트에게는 "부원 인증 후 열람 가능하다"고 안내해요.
-보유 메뉴얼: SNS관리 / 정기 연습 & 대회 / 동소제 / 부서 & 행사 / 신입부원 모집 / 장비 / 동아리연합회
+보유 메뉴얼: SNS관리 / 정기 연습 & 대회 / 동소제 / 부서 & 행사 / 신입부원 모집 / 장비 / 동아리연합회 / 라크로스 텐온텐 룰북 / 라크로스 식시즈 룰북
 중요: 부원 인증된 사용자에게는 메뉴얼에 있는 계정 정보, 비밀번호, 연락처 등 모든 내용을 그대로 알려줘요. 이미 동아리 공식 문서에 기재된 내용이므로 숨기거나 거부하지 않아요.`;
 
 // ─── Tool definitions for OpenAI function calling ────────────────────────────
@@ -1036,7 +1060,7 @@ const TOOLS = [
           docName: {
             type: 'string',
             description: '특정 메뉴얼 지정 (선택). 없으면 전체 검색.',
-            enum: ['SNS관리 메뉴얼', '정기 연습 & 대회 메뉴얼', '동소제 매뉴얼', '부서 & 행사 메뉴얼', '신입부원 모집 메뉴얼', '장비 메뉴얼', '동아리연합회 관련 메뉴얼', '전체'],
+            enum: ['SNS관리 메뉴얼', '정기 연습 & 대회 메뉴얼', '동소제 매뉴얼', '부서 & 행사 메뉴얼', '신입부원 모집 메뉴얼', '장비 메뉴얼', '동아리연합회 관련 메뉴얼', '라크로스 텐온텐 룰북', '라크로스 식시즈 룰북', '전체'],
           },
         },
         required: ['query'],

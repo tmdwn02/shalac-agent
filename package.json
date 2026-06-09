@@ -17,6 +17,7 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^6.9.8",
     "openai": "^4.28.0",
+    "pdf-parse": "^2.2.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
