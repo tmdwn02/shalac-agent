@@ -1000,14 +1000,17 @@
       <div class="ocr-field">
         <label>분류</label>
         <input id="ocr_category" type="text" value="${ocr.category || ''}" placeholder="식비, 장비비 등" />
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">예) 동소제 부스 준비, 대회 참가비, 장비 구입 등</div>
       </div>
       <div class="ocr-field">
         <label>거래금액</label>
         <input id="ocr_amount"   type="number" value="${ocr.amount || ''}" placeholder="숫자만 입력" />
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">💡 동아리 예산 지출이므로 금액 앞에 마이너스(-) 부호가 붙어 있는 것이 정상이에요!</div>
       </div>
       <div class="ocr-field">
         <label>대상</label>
         <input id="ocr_target"   type="text" value="${ocr.target   || ''}" placeholder="환급 대상 부원 이름" />
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">예산을 사용한(실제 비용을 지불한) 부원 이름을 적어주세요!</div>
       </div>
       <div class="ocr-field">
         <label>내용</label>
