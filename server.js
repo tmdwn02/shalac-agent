@@ -31,6 +31,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/calendar',
 ];
 
 async function getAuthClient() {
@@ -329,22 +330,75 @@ async function getPublicInfo(type) {
   }
 }
 
+// ─── Google Calendar ──────────────────────────────────────────────────────────
+const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'primary';
+
+async function createCalendarEvent({ title, date, startTime, endTime, description }) {
+  try {
+    const auth = await getAuthClient();
+    const calendar = google.calendar({ version: 'v3', auth });
+    const start = startTime
+      ? { dateTime: `${date}T${startTime}:00+09:00`, timeZone: 'Asia/Seoul' }
+      : { date };
+    const end = endTime
+      ? { dateTime: `${date}T${endTime}:00+09:00`, timeZone: 'Asia/Seoul' }
+      : { date };
+    const event = await calendar.events.insert({
+      calendarId: CALENDAR_ID,
+      requestBody: { summary: title, description, start, end },
+    });
+    return { success: true, link: event.data.htmlLink };
+  } catch (e) {
+    console.error('캘린더 이벤트 생성 실패:', e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+async function getUpcomingEvents(days = 7) {
+  try {
+    const auth = await getAuthClient();
+    const calendar = google.calendar({ version: 'v3', auth });
+    const now = new Date();
+    const later = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    const res = await calendar.events.list({
+      calendarId: CALENDAR_ID,
+      timeMin: now.toISOString(),
+      timeMax: later.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+      maxResults: 20,
+    });
+    return res.data.items || [];
+  } catch (e) {
+    console.error('캘린더 조회 실패:', e.message);
+    return [];
+  }
+}
+
+// ─── 게스트 승인 토큰 저장소 (메모리) ─────────────────────────────────────────
+const pendingGuests = {}; // token → guestData
+
 // ─── 게스트 신청 처리 ─────────────────────────────────────────────────────────
 async function registerGuest(data) {
   const { name, department, studentId, date } = data;
   if (!name || !department || !studentId || !date) {
     return { success: false, message: '이름, 학과, 학번, 참여일자를 모두 입력해주세요!' };
   }
-  const row = [name, department, studentId, date, '미입금', new Date().toLocaleString('ko-KR')];
-  const ok = await appendSheet(SPREADSHEET_IDS.guests, '게스트 참여!A:F', row);
-  if (ok) {
-    await sendEmailNotification(
-      `[샤락] 새 게스트 신청: ${name}`,
-      `이름: ${name}\n학과: ${department}\n학번: ${studentId}\n참여일자: ${date}`
-    );
-    return { success: true, message: `${name}님 게스트 신청 완료! 🎉 입금 안내는 운영진에게 문의해 주세요.` };
-  }
-  return { success: false, message: '신청 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.' };
+
+  // 승인 토큰 생성
+  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  pendingGuests[token] = { name, department, studentId, date, createdAt: new Date().toISOString() };
+
+  const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+  const approveUrl = `${baseUrl}/api/guest-action?token=${token}&action=approve`;
+  const rejectUrl  = `${baseUrl}/api/guest-action?token=${token}&action=reject`;
+
+  await sendEmailNotification(
+    `[샤락] 게스트 신청 승인 요청: ${name}`,
+    `새 게스트 신청이 들어왔어요!\n\n이름: ${name}\n학과: ${department}\n학번: ${studentId}\n참여일자: ${date}\n\n✅ 승인: ${approveUrl}\n❌ 거절: ${rejectUrl}`
+  );
+
+  return { success: true, message: `${name}님 게스트 신청이 접수됐어요! 🎉 운영진 승인 후 확정돼요. 잠시만 기다려주세요~` };
 }
 
 // ─── 훈련 기록 저장 ───────────────────────────────────────────────────────────
@@ -355,9 +409,18 @@ async function saveTraining(data) {
   }
   const row = [date, participants, attendees || '', content, new Date().toLocaleString('ko-KR')];
   const ok = await appendSheet(SPREADSHEET_IDS.training, '훈련 내용!A:E', row);
-  return ok
-    ? { success: true, message: `훈련 기록 저장 완료! 💪 ${date} 훈련 기록됐어요.` }
-    : { success: false, message: '저장 중 오류가 발생했어요.' };
+  if (!ok) return { success: false, message: '저장 중 오류가 발생했어요.' };
+
+  // 구글 캘린더에도 자동 등록
+  await createCalendarEvent({
+    title: `🥍 SHALAC 훈련`,
+    date,
+    startTime: '18:00',
+    endTime: '20:00',
+    description: `참여인원: ${participants}명${attendees ? '\n참여자: ' + attendees : ''}\n내용: ${content}`,
+  });
+
+  return { success: true, message: `훈련 기록 저장 완료! 💪 ${date} 훈련 기록됐어요.` };
 }
 
 async function updateTraining(date, fields) {
@@ -438,9 +501,15 @@ async function saveBudget(data) {
   ];
 
   const ok = await appendSheet(SPREADSHEET_IDS.budget, '시트1!A:G', row);
-  return ok
-    ? { success: true, message: `예산 기록 완료! 💰 ${content} ${amtNum.toLocaleString()}원 → 잔액 ${newBalance.toLocaleString()}원` }
-    : { success: false, message: '저장 중 오류가 발생했어요.' };
+  if (!ok) return { success: false, message: '저장 중 오류가 발생했어요.' };
+
+  // 운영진에게 확인 이메일 발송
+  await sendEmailNotification(
+    `[샤락] 예산 기록 알림: ${content}`,
+    `예산 내역이 기록되었어요.\n\n거래일시: ${date}\n분류: ${category || '-'}\n금액: ${amtNum.toLocaleString()}원\n대상: ${target || '-'}\n내용: ${content}\n비고: ${note || '-'}\n\n거래 후 잔액: ${newBalance.toLocaleString()}원`
+  );
+
+  return { success: true, message: `예산 기록 완료! 💰 ${content} ${amtNum.toLocaleString()}원 → 잔액 ${newBalance.toLocaleString()}원` };
 }
 
 // ─── 장비 대여 기록 ───────────────────────────────────────────────────────────
@@ -996,6 +1065,20 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'get_calendar_events',
+      description: '구글 캘린더에서 앞으로의 일정을 조회합니다. "다음 훈련 언제야?", "이번 주 일정 알려줘" 등의 질문에 사용합니다.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number', description: '조회할 일수 (기본 7일)', default: 7 },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'generate_training_routine',
       description: '과거 훈련 기록과 오늘 날씨를 참고하여 오늘의 훈련 루틴을 생성합니다',
       parameters: {
@@ -1137,6 +1220,17 @@ async function executeTool(name, args, authLevel) {
     }
     case 'generate_training_routine': {
       return await generateTrainingRoutine(args.participants, args.weather_context);
+    }
+    case 'get_calendar_events': {
+      const events = await getUpcomingEvents(args.days || 7);
+      if (!events.length) return '앞으로 등록된 일정이 없어요.';
+      const lines = events.map(e => {
+        const start = e.start.dateTime
+          ? new Date(e.start.dateTime).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+          : e.start.date;
+        return `• ${e.summary} — ${start}`;
+      });
+      return `📅 앞으로의 일정:\n${lines.join('\n')}`;
     }
     case 'query_accounting_history': {
       const targetPeriod = args.period === 'all' ? null : args.period;
@@ -1617,6 +1711,34 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 app.post('/api/verify-password', (req, res) => {
   const { password } = req.body;
   res.json({ valid: verifyPassword(password) });
+});
+
+// ─── 게스트 승인/거절 엔드포인트 ──────────────────────────────────────────────
+app.get('/api/guest-action', async (req, res) => {
+  const { token, action } = req.query;
+  const guest = pendingGuests[token];
+  if (!guest) {
+    return res.send('<h2>❌ 유효하지 않거나 이미 처리된 신청이에요.</h2>');
+  }
+
+  const { name, department, studentId, date } = guest;
+  delete pendingGuests[token];
+
+  if (action === 'approve') {
+    const row = [name, department, studentId, date, '미입금', new Date().toLocaleString('ko-KR')];
+    await appendSheet(SPREADSHEET_IDS.guests, '게스트 참여!A:F', row);
+    await sendEmailNotification(
+      `[샤락] 게스트 승인 완료: ${name}`,
+      `${name}님의 게스트 신청이 승인되었어요!\n참여일: ${date}\n입금 안내를 진행해주세요.`
+    );
+    return res.send(`<h2>✅ ${name}님 게스트 신청을 승인했어요!</h2><p>시트에 기록됐어요. 입금 안내를 진행해주세요.</p>`);
+  } else {
+    await sendEmailNotification(
+      `[샤락] 게스트 거절: ${name}`,
+      `${name}님의 게스트 신청이 거절되었어요.\n참여일: ${date}`
+    );
+    return res.send(`<h2>❌ ${name}님 게스트 신청을 거절했어요.</h2>`);
+  }
 });
 
 // 알림 테스트용 (부원 인증 필요)
