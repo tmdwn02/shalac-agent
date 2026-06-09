@@ -187,18 +187,19 @@ async function appendSheet(spreadsheetId, range, values) {
 }
 
 // ─── 이메일 알림 ──────────────────────────────────────────────────────────────
-async function sendEmailNotification(subject, text) {
+const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
+  auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+});
+
+async function sendEmailNotification(subject, text, to) {
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return;
   try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-    });
     await transporter.sendMail({
       from: process.env.GMAIL_USER,
-      to: process.env.ADMIN_EMAIL || process.env.GMAIL_USER,
+      to: to || process.env.ADMIN_EMAIL || process.env.GMAIL_USER,
       subject,
       text,
     });
