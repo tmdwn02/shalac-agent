@@ -2062,6 +2062,21 @@ app.post('/api/test-alerts', async (req, res) => {
   res.json({ ok: true, message: '알림 체크 완료! 조건 충족 시 메일이 발송됐어요.' });
 });
 
+// 이메일 직접 발송 테스트 (조건 없이 무조건 발송)
+app.post('/api/test-email', async (req, res) => {
+  const { password } = req.body;
+  if (!verifyPassword(password)) return res.status(403).json({ error: '인증 필요' });
+  try {
+    await sendEmailNotification(
+      '✅ [샤락 에이전트] 이메일 테스트',
+      `이메일 발송이 정상적으로 작동하고 있어요! 🎉\n\n발송 시각: ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`
+    );
+    res.json({ ok: true, message: `${process.env.ADMIN_EMAIL} 으로 테스트 메일 발송 완료!` });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 월간 리포트 즉시 발송 테스트
 app.post('/api/test-monthly-report', async (req, res) => {
   const { password } = req.body;
