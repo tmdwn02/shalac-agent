@@ -554,37 +554,8 @@
     <p>SHALAC 라크로스 동아리의 AI 어시스턴트예요.<br>
     아래 버튼을 누르거나 직접 물어보세요!</p>
 
-    <div class="quick-actions">
-      <button class="quick-btn" onclick="sendQuickMessage('게스트 신청을 하고 싶어요')">
-        <span class="btn-icon">🙋</span>
-        <span class="btn-label">게스트 신청</span>
-        <span class="btn-desc">훈련 참여 신청</span>
-      </button>
-      <button class="quick-btn" onclick="sendQuickMessage('훈련 내용을 기록하고 싶어요')">
-        <span class="btn-icon">📋</span>
-        <span class="btn-label">훈련 기록</span>
-        <span class="btn-desc">일자·내용 기록</span>
-      </button>
-      <button class="quick-btn" onclick="sendQuickMessage('예산 사용내역을 기록할게요')">
-        <span class="btn-icon">💰</span>
-        <span class="btn-label">예산 기록</span>
-        <span class="btn-desc">사용내역 입력</span>
-      </button>
-      <button class="quick-btn" onclick="sendQuickMessage('장비 대여 기록을 하고 싶어요')">
-        <span class="btn-icon">🏒</span>
-        <span class="btn-label">장비 대여</span>
-        <span class="btn-desc">스틱·볼 대여</span>
-      </button>
-      <button class="quick-btn" onclick="sendQuickMessage('인스타그램 홍보글을 작성해줘')">
-        <span class="btn-icon">📸</span>
-        <span class="btn-label">홍보글 작성</span>
-        <span class="btn-desc">인스타 캡션</span>
-      </button>
-      <button class="quick-btn" onclick="sendQuickMessage('동아리소개제 준비를 도와줘')">
-        <span class="btn-icon">🎪</span>
-        <span class="btn-label">소개제 준비</span>
-        <span class="btn-desc">행사 기획 도움</span>
-      </button>
+    <div class="quick-actions" id="quickActions">
+      <!-- 동적으로 로드됨 -->
     </div>
   </div>
 
@@ -729,6 +700,34 @@
     userInputEl.value = text;
     sendMessage();
   }
+
+  // ── 인기 검색어 버튼 로드 ────────────────────────────────────────────────────
+  const QUICK_ICONS = ['🔥','💬','📋','💰','🏒','🎪','📸','🌤️','🙋','📊'];
+  async function loadSuggestions() {
+    const container = document.getElementById('quickActions');
+    try {
+      const res = await fetch('/api/suggestions');
+      const { suggestions } = await res.json();
+      container.innerHTML = suggestions.map((text, i) => `
+        <button class="quick-btn" onclick="sendQuickMessage(${JSON.stringify(text)})">
+          <span class="btn-icon">${QUICK_ICONS[i % QUICK_ICONS.length]}</span>
+          <span class="btn-label">${text.length > 14 ? text.slice(0, 13) + '…' : text}</span>
+          <span class="btn-desc">${text}</span>
+        </button>
+      `).join('');
+    } catch {
+      // 실패 시 기본값
+      container.innerHTML = `
+        <button class="quick-btn" onclick="sendQuickMessage('게스트 신청을 하고 싶어요')"><span class="btn-icon">🙋</span><span class="btn-label">게스트 신청</span><span class="btn-desc">훈련 참여 신청</span></button>
+        <button class="quick-btn" onclick="sendQuickMessage('훈련 내용을 기록하고 싶어요')"><span class="btn-icon">📋</span><span class="btn-label">훈련 기록</span><span class="btn-desc">일자·내용 기록</span></button>
+        <button class="quick-btn" onclick="sendQuickMessage('예산 사용내역을 기록할게요')"><span class="btn-icon">💰</span><span class="btn-label">예산 기록</span><span class="btn-desc">사용내역 입력</span></button>
+        <button class="quick-btn" onclick="sendQuickMessage('장비 대여 기록을 하고 싶어요')"><span class="btn-icon">🏒</span><span class="btn-label">장비 대여</span><span class="btn-desc">스틱·볼 대여</span></button>
+        <button class="quick-btn" onclick="sendQuickMessage('인스타그램 홍보글을 작성해줘')"><span class="btn-icon">📸</span><span class="btn-label">홍보글 작성</span><span class="btn-desc">인스타 캡션</span></button>
+        <button class="quick-btn" onclick="sendQuickMessage('동아리소개제 준비를 도와줘')"><span class="btn-icon">🎪</span><span class="btn-label">소개제 준비</span><span class="btn-desc">행사 기획 도움</span></button>
+      `;
+    }
+  }
+  loadSuggestions();
 
   // ── 메시지 전송 ──────────────────────────────────────────────────────────────
   async function sendMessage() {

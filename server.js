@@ -60,6 +60,7 @@ const SPREADSHEET_IDS = {
   training: process.env.SHEET_TRAINING_ID || '',
   budget: process.env.SHEET_BUDGET_ID || '',
   equipment: process.env.SHEET_EQUIPMENT_ID || '',
+  queries: process.env.SHEET_QUERIES_ID || '',
 };
 
 // ─── 동아리 운영 메뉴얼 파일 목록 ─────────────────────────────────────────────
@@ -1241,11 +1242,87 @@ function verifyPassword(password) {
 }
 
 // ─── 채팅 API ─────────────────────────────────────────────────────────────────
+// ─── 쿼리 로깅 ───────────────────────────────────────────────────────────────
+async function logQuery(query) {
+  try {
+    if (!SPREADSHEET_IDS.queries) return;
+    const auth = await getAuthClient();
+    const sheets = google.sheets({ version: 'v4', auth });
+    const now = new Date().toISOString();
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_IDS.queries,
+      range: '시트1!A:B',
+      valueInputOption: 'RAW',
+      requestBody: { values: [[now, query]] },
+    });
+  } catch (e) {
+    // 로깅 실패는 무시
+  }
+}
+
+// ─── 인기 검색어 API ──────────────────────────────────────────────────────────
+app.get('/api/suggestions', async (req, res) => {
+  const defaults = [
+    '이번 주 날씨 어때?',
+    '훈련 출석 순위 알려줘',
+    '라크로스 반칙 규정 알려줘',
+    '최근 훈련 내용 보여줘',
+    '장비 대여 현황 알려줘',
+    '예산 현황 알려줘',
+  ];
+
+  try {
+    if (!SPREADSHEET_IDS.queries) return res.json({ suggestions: defaults });
+
+    const auth = await getAuthClient();
+    const sheets = google.sheets({ version: 'v4', auth });
+    const result = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.queries,
+      range: '시트1!A:B',
+    });
+
+    const rows = result.data.values || [];
+    if (rows.length < 5) return res.json({ suggestions: defaults });
+
+    // 최근 7일 필터
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentQueries = rows
+      .filter(row => row[0] && row[1] && new Date(row[0]) > weekAgo)
+      .map(row => row[1].trim())
+      .filter(q => q.length > 1 && q.length < 50);
+
+    if (recentQueries.length < 5) return res.json({ suggestions: defaults });
+
+    // 빈도 집계
+    const freq = {};
+    for (const q of recentQueries) {
+      freq[q] = (freq[q] || 0) + 1;
+    }
+    const top6 = Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([q]) => q);
+
+    // 6개 미만이면 defaults로 채움
+    while (top6.length < 6) top6.push(defaults[top6.length]);
+
+    res.json({ suggestions: top6 });
+  } catch (e) {
+    res.json({ suggestions: defaults });
+  }
+});
+
 app.post('/api/chat', async (req, res) => {
   const { messages, password } = req.body;
 
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages 필드가 필요합니다.' });
+  }
+
+  // 사용자 마지막 메시지 로깅 (hidden_ 접두사 제외)
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  if (lastUserMsg && !lastUserMsg.content?.startsWith?.('hidden_')) {
+    logQuery(typeof lastUserMsg.content === 'string' ? lastUserMsg.content : JSON.stringify(lastUserMsg.content));
   }
 
   const authLevel = verifyPassword(password) ? 'member' : 'guest';
