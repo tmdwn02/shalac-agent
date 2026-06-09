@@ -882,8 +882,67 @@ SNS, 훈련, 대회, 동소제 준비, 장비, 신입 모집, 동아리연합회
 중요: 부원 인증된 사용자에게는 메뉴얼에 있는 계정 정보, 비밀번호, 연락처 등 모든 내용을 그대로 알려줘요. 이미 동아리 공식 문서에 기재된 내용이므로 숨기거나 거부하지 않아요.`;
 
 // ─── 한국라크로스협회 크롤링 ──────────────────────────────────────────────────
-// 대회 목록 (ID → 이름 매핑, 자주 쓰는 대회 캐시)
 const KLA_TOURNAMENT_CACHE = {};
+let KLA_KNOWN_IDS = new Set([27,28,29,30,31,32,33,34,35,36,37,38]); // 2025년까지 알려진 ID
+
+// 대회 목록 페이지에서 현재 시즌 대회 ID 전체 조회
+async function fetchKlaTournamentList(season) {
+  const year = season || new Date().getFullYear();
+  try {
+    const res = await fetch(`https://lacrosse.or.kr/ko/stat_page/?filter_season=${year}`);
+    const html = await res.text();
+    const ids = [...html.matchAll(/local_tournament\/(\d+)/g)].map(m => parseInt(m[1]));
+    return [...new Set(ids)];
+  } catch (e) {
+    console.error('KLA 목록 조회 실패:', e.message);
+    return [];
+  }
+}
+
+// 대회명 추출 (목록 페이지에서)
+async function fetchKlaTournamentNames(season) {
+  const year = season || new Date().getFullYear();
+  try {
+    const res = await fetch(`https://lacrosse.or.kr/ko/stat_page/?filter_season=${year}`);
+    const html = await res.text();
+    // ID와 이름 함께 추출
+    const matches = [...html.matchAll(/local_tournament\/(\d+)\/[^>]*>([^<]+)</g)];
+    const result = {};
+    for (const m of matches) {
+      result[m[1]] = m[2].trim();
+    }
+    return result;
+  } catch (e) {
+    return {};
+  }
+}
+
+// 새 대회 감지 (매일 체크)
+async function checkNewTournaments() {
+  try {
+    const year = new Date().getFullYear();
+    const currentIds = await fetchKlaTournamentList(year);
+    const newIds = currentIds.filter(id => !KLA_KNOWN_IDS.has(id));
+
+    if (newIds.length > 0) {
+      const names = await fetchKlaTournamentNames(year);
+      for (const id of newIds) {
+        KLA_KNOWN_IDS.add(id);
+        const name = names[id] || `대회 #${id}`;
+        KLA_TOURNAMENT_NAMES[id] = name; // 이름 캐시 업데이트
+        console.log(`🏆 새 대회 발견: ${name} (ID: ${id})`);
+        await runNotificationAgent('new_tournament', {
+          id, name, url: `https://lacrosse.or.kr/ko/stat_page/local_tournament/${id}/`, year,
+        });
+      }
+    }
+
+    // 알려진 ID 목록도 업데이트 (이전 연도 포함)
+    currentIds.forEach(id => KLA_KNOWN_IDS.add(id));
+  } catch (e) {
+    console.error('새 대회 감지 실패:', e.message);
+  }
+}
 
 async function fetchKlaTournament(tournamentId) {
   const url = `https://lacrosse.or.kr/ko/stat_page/local_tournament/${tournamentId}/`;
@@ -930,16 +989,23 @@ async function fetchKlaTournament(tournamentId) {
   }
 }
 
+// 알려진 대회 이름 캐시 (ID → 이름)
+const KLA_TOURNAMENT_NAMES = {
+  38: '2025 대학리그 여자부',
+  37: '2025 대학리그 남자부',
+  36: '2024 대학리그 여자부',
+  35: '2024 대학리그 남자부',
+};
+
 async function searchKlaTournament(query) {
   // HTML 전체를 GPT에 넘겨서 자연어로 파싱
   try {
-    // 기본적으로 최근 대회 ID 목록 (38 = 2025 대학리그 여자부)
-    const knownTournaments = [
-      { id: 38, name: '2025 대학리그 여자부' },
-      { id: 37, name: '2025 대학리그 남자부' },
-      { id: 36, name: '2024 대학리그 여자부' },
-      { id: 35, name: '2024 대학리그 남자부' },
-    ];
+    // KLA_KNOWN_IDS 기반으로 knownTournaments 동적 구성 (높은 ID = 최신 우선)
+    const sortedIds = [...KLA_KNOWN_IDS].sort((a, b) => b - a);
+    const knownTournaments = sortedIds.map(id => ({
+      id,
+      name: KLA_TOURNAMENT_NAMES[id] || `대회 #${id}`,
+    }));
 
     // 쿼리에서 관련 대회 찾기
     const matched = knownTournaments.find(t =>
@@ -996,6 +1062,7 @@ async function runNotificationAgent(event, data) {
 - training_record: 알림 불필요 (캘린더 등록으로 충분)
 - exam_vote_reminder: 항상 알림 (시험기간 투표 진행 요청)
 - recruit_reminder: 항상 알림 (신입부원 모집 준비 시작 안내, 학기 시작 3주 전)
+- new_tournament: 항상 알림 (KLA 한국라크로스협회에 새 대회가 등록됨, 참가 검토 필요)
 
 반드시 아래 JSON 형식으로만 답하세요:
 {"send": true/false, "subject": "제목", "body": "내용"}`,
@@ -2147,10 +2214,10 @@ ${topExpenses}
 }
 
 // ── 스케줄 등록 ──────────────────────────────────────────────────────────────
-// 매일 오전 9시: 잔액/훈련 알림 체크
+// 매일 오전 9시: 잔액/훈련 알림 체크 + KLA 새 대회 감지
 cron.schedule('0 9 * * *', async () => {
   console.log('🔔 선제적 알림 체크 시작...');
-  await Promise.all([checkBudgetAlert(), checkTrainingAlert()]);
+  await Promise.all([checkBudgetAlert(), checkTrainingAlert(), checkNewTournaments()]);
   console.log('✅ 알림 체크 완료');
 }, { timezone: 'Asia/Seoul' });
 
@@ -2306,4 +2373,20 @@ app.listen(PORT, async () => {
     loadManuals(),
     initDriveFolders(),
   ]);
+
+  // 서버 시작 시 현재 연도 + 전년도 KLA 대회 ID 로드 (기준선 설정)
+  try {
+    const year = new Date().getFullYear();
+    const [currNames, prevNames, currIds, prevIds] = await Promise.all([
+      fetchKlaTournamentNames(year),
+      fetchKlaTournamentNames(year - 1),
+      fetchKlaTournamentList(year),
+      fetchKlaTournamentList(year - 1),
+    ]);
+    [...currIds, ...prevIds].forEach(id => KLA_KNOWN_IDS.add(id));
+    Object.assign(KLA_TOURNAMENT_NAMES, prevNames, currNames);
+    console.log(`🏆 KLA 기준 대회 ID 로드 완료 (${KLA_KNOWN_IDS.size}개, 이름 ${Object.keys(KLA_TOURNAMENT_NAMES).length}개)`);
+  } catch (e) {
+    console.error('KLA 초기 로드 실패:', e.message);
+  }
 });
