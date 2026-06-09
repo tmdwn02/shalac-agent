@@ -896,6 +896,7 @@ async function runNotificationAgent(event, data) {
 - training_missing: 7일 이상 기록 없으면 알림
 - training_record: 알림 불필요 (캘린더 등록으로 충분)
 - exam_vote_reminder: 항상 알림 (시험기간 투표 진행 요청)
+- recruit_reminder: 항상 알림 (신입부원 모집 준비 시작 안내, 학기 시작 3주 전)
 
 반드시 아래 JSON 형식으로만 답하세요:
 {"send": true/false, "subject": "제목", "body": "내용"}`,
@@ -2043,21 +2044,28 @@ cron.schedule('0 9 * * 1', async () => {
   const day = now.getDate();
   const week = Math.ceil(day / 7); // 몇째 주인지
 
-  const targets = [
+  const examTargets = [
     { month: 4,  week: 1, label: '1학기 중간고사' },
     { month: 5,  week: 3, label: '1학기 기말고사' },
     { month: 9,  week: 1, label: '2학기 중간고사' },
     { month: 11, week: 3, label: '2학기 기말고사' },
   ];
 
-  const matched = targets.find(t => t.month === month && t.week === week);
-  if (matched) {
-    console.log(`📅 시험기간 투표 알림 발송: ${matched.label}`);
-    await runNotificationAgent('exam_vote_reminder', {
-      examName: matched.label,
-      month,
-      week,
-    });
+  const recruitTargets = [
+    { month: 2, week: 1, label: '1학기 신입모집' },
+    { month: 8, week: 1, label: '2학기 신입모집' },
+  ];
+
+  const matchedExam = examTargets.find(t => t.month === month && t.week === week);
+  if (matchedExam) {
+    console.log(`📅 시험기간 투표 알림 발송: ${matchedExam.label}`);
+    await runNotificationAgent('exam_vote_reminder', { examName: matchedExam.label, month, week });
+  }
+
+  const matchedRecruit = recruitTargets.find(t => t.month === month && t.week === week);
+  if (matchedRecruit) {
+    console.log(`📢 신입모집 준비 알림 발송: ${matchedRecruit.label}`);
+    await runNotificationAgent('recruit_reminder', { label: matchedRecruit.label, month, week });
   }
 }, { timezone: 'Asia/Seoul' });
 
