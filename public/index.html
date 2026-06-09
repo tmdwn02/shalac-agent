@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>샤락이 🥍 — SHALAC 라크로스</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3248;
+      --primary: #5b6af5;
+      --primary-hover: #4a58e0;
+      --accent: #f5a623;
+      --text: #e8eaf6;
+      --text-muted: #8891b8;
+      --user-bubble: #2d3561;
+      --bot-bubble: #1e2235;
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+    }
+
+    .header-info h1 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .header-info p {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .auth-badge {
+      margin-left: auto;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+
+    .auth-badge.member {
+      border-color: #4caf50;
+      color: #4caf50;
+    }
+
+    .auth-badge:hover { opacity: 0.8; }
+
+    /* ── Chat Area ── */
+    .chat-wrapper {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      scroll-behavior: smooth;
+    }
+
+    .chat-wrapper::-webkit-scrollbar { width: 4px; }
+    .chat-wrapper::-webkit-scrollbar-track { background: transparent; }
+    .chat-wrapper::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ── Welcome Screen ── */
+    .welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 60px 20px 20px;
+    }
+
+    .welcome-icon {
+      font-size: 3.5rem;
+      margin-bottom: 16px;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .welcome h2 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .welcome p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      max-width: 380px;
+      line-height: 1.6;
+    }
+
+    /* ── Quick Action Buttons ── */
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 28px 0 0;
+      width: 100%;
+      max-width: 600px;
+    }
+
+    .quick-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+      color: var(--text);
+    }
+
+    .quick-btn:hover {
+      border-color: var(--primary);
+      background: rgba(91, 106, 245, 0.08);
+      transform: translateY(-2px);
+    }
+
+    .quick-btn .btn-icon { font-size: 1.3rem; margin-bottom: 6px; display: block; }
+    .quick-btn .btn-label { font-size: 0.78rem; font-weight: 600; display: block; }
+    .quick-btn .btn-desc { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; display: block; }
+
+    /* ── Messages ── */
+    .messages { display: flex; flex-direction: column; gap: 16px; }
+
+    .message {
+      display: flex;
+      gap: 10px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      flex-direction: row-reverse;
+    }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+
+    .bubble {
+      max-width: 72%;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 0.88rem;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .message.bot .bubble {
+      background: var(--bot-bubble);
+      border: 1px solid var(--border);
+      border-top-left-radius: 4px;
+    }
+
+    .message.user .bubble {
+      background: var(--user-bubble);
+      border-top-right-radius: 4px;
+    }
+
+    /* ── Typing indicator ── */
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 12px 16px;
+      background: var(--bot-bubble);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      border-top-left-radius: 4px;
+      width: fit-content;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      animation: bounce 1.2s infinite;
+    }
+
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    /* ── Input Area ── */
+    .input-area {
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      transition: border-color 0.2s;
+    }
+
+    .input-row:focus-within {
+      border-color: var(--primary);
+    }
+
+    #userInput {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 0.9rem;
+      resize: none;
+      min-height: 24px;
+      max-height: 120px;
+      outline: none;
+      line-height: 1.5;
+      font-family: inherit;
+    }
+
+    #userInput::placeholder { color: var(--text-muted); }
+
+    #sendBtn {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      background: var(--primary);
+      border: none;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+
+    #sendBtn:hover { background: var(--primary-hover); }
+    #sendBtn:disabled { background: var(--border); cursor: not-allowed; }
+
+    /* 파일 첨부 버튼 */
+    #attachBtn {
+      width: 34px; height: 34px;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+      font-size: 1rem;
+    }
+    #attachBtn:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* 파일 미리보기 */
+    .file-preview {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 6px;
+      font-size: 0.78rem;
+    }
+    .file-preview img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
+    .file-preview .file-info { flex: 1; }
+    .file-preview .file-name { font-weight: 600; color: var(--text); }
+    .file-preview .file-size { color: var(--text-muted); font-size: 0.7rem; }
+    .file-preview .remove-btn {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 1rem; padding: 2px 4px;
+    }
+    .file-preview .remove-btn:hover { color: #f44336; }
+
+    /* 업로드 모드 선택 */
+    .upload-mode {
+      display: flex; gap: 6px; margin-bottom: 6px;
+    }
+    .mode-btn {
+      padding: 4px 10px; border-radius: 20px; font-size: 0.72rem;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+    }
+    .mode-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(245,166,35,0.1); }
+
+    .input-hint {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 6px;
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      width: 90%;
+      max-width: 380px;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .modal h3 { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+    .modal p { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px; }
+
+    .modal input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+      margin-bottom: 12px;
+    }
+
+    .modal input:focus { border-color: var(--primary); }
+
+    .modal-btns {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .btn-cancel {
+      padding: 8px 16px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.82rem;
+    }
+
+    .btn-confirm {
+      padding: 8px 16px;
+      background: var(--primary);
+      border: none;
+      border-radius: var(--radius-sm);
+      color: white;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .btn-confirm:hover { background: var(--primary-hover); }
+
+    .modal-error {
+      font-size: 0.78rem;
+      color: #f44336;
+      margin-top: -8px;
+      margin-bottom: 8px;
+      display: none;
+    }
+
+    /* ── OCR 확인 카드 ── */
+    .ocr-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 0.84rem;
+      min-width: 260px;
+      max-width: 340px;
+    }
+    .ocr-card-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+      color: var(--primary);
+    }
+    .ocr-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .ocr-field label {
+      width: 70px;
+      flex-shrink: 0;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .ocr-field input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      color: var(--text);
+      font-size: 0.82rem;
+      outline: none;
+    }
+    .ocr-field input:focus { border-color: var(--primary); }
+    .ocr-card-btns {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .ocr-card-btns button {
+      flex: 1;
+      padding: 7px 0;
+      border-radius: 7px;
+      border: none;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .ocr-card-btns button:hover { opacity: .85; }
+    .ocr-btn-confirm { background: var(--primary); color: #fff; }
+    .ocr-btn-cancel  { background: var(--border); color: var(--text-muted); }
+    .ocr-card.done { opacity: .55; pointer-events: none; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      /* 전체 레이아웃 */
+      body { font-size: 14px; }
+      .app { border-radius: 0; height: 100dvh; }
+
+      /* 헤더 */
+      .header { padding: 10px 14px; }
+      .header-info h1 { font-size: 1rem; }
+      .header-info p  { font-size: 0.7rem; }
+      #authBadge { font-size: 0.72rem; padding: 4px 10px; }
+
+      /* 채팅 영역 */
+      .chat-wrapper { padding: 12px 10px; }
+      .bubble { max-width: 88%; font-size: 0.84rem; padding: 9px 12px; }
+      .avatar { width: 28px; height: 28px; font-size: 0.85rem; flex-shrink: 0; }
+
+      /* 웰컴 */
+      .welcome { padding: 16px 10px; }
+      .welcome h2 { font-size: 1rem; }
+      .welcome p  { font-size: 0.78rem; }
+      .quick-actions { grid-template-columns: repeat(2, 1fr); gap: 7px; }
+      .quick-btn { padding: 10px 6px; }
+      .quick-btn .btn-icon  { font-size: 1.1rem; }
+      .quick-btn .btn-label { font-size: 0.72rem; }
+      .quick-btn .btn-desc  { display: none; }
+
+      /* 입력 영역 */
+      .input-area { padding: 8px 10px 10px; gap: 6px; }
+      #userInput { font-size: 0.9rem; padding: 9px 12px; }
+      #sendBtn, #attachBtn { width: 38px; height: 38px; font-size: 1rem; flex-shrink: 0; }
+
+      /* 파일 미리보기 */
+      .file-preview-area { padding: 6px 10px; }
+      .upload-mode { gap: 5px; flex-wrap: wrap; }
+      .mode-btn { font-size: 0.7rem; padding: 4px 8px; }
+
+      /* OCR 카드 */
+      .ocr-card { min-width: unset; max-width: 100%; }
+      .ocr-field label { width: 58px; font-size: 0.7rem; }
+      .ocr-field input { font-size: 0.78rem; }
+
+      /* 모달 */
+      .modal { width: 90vw; padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">🥍</div>
+  <div class="header-info">
+    <h1>샤락이</h1>
+    <p>SHALAC 라크로스 동아리 AI 어시스턴트</p>
+  </div>
+  <button class="auth-badge" id="authBadge" onclick="openPasswordModal()">
+    🔓 게스트
+  </button>
+</header>
+
+<!-- Chat Area -->
+<div class="chat-wrapper" id="chatWrapper">
+
+  <!-- Welcome (초기 화면) -->
+  <div class="welcome" id="welcomeScreen">
+    <div class="welcome-icon">🥍</div>
+    <h2>안녕하세요! 저는 샤락이예요</h2>
+    <p>SHALAC 라크로스 동아리의 AI 어시스턴트예요.<br>
+    아래 버튼을 누르거나 직접 물어보세요!</p>
+
+    <div class="quick-actions">
+      <button class="quick-btn" onclick="sendQuickMessage('게스트 신청을 하고 싶어요')">
+        <span class="btn-icon">🙋</span>
+        <span class="btn-label">게스트 신청</span>
+        <span class="btn-desc">훈련 참여 신청</span>
+      </button>
+      <button class="quick-btn" onclick="sendQuickMessage('훈련 내용을 기록하고 싶어요')">
+        <span class="btn-icon">📋</span>
+        <span class="btn-label">훈련 기록</span>
+        <span class="btn-desc">일자·내용 기록</span>
+      </button>
+      <button class="quick-btn" onclick="sendQuickMessage('예산 사용내역을 기록할게요')">
+        <span class="btn-icon">💰</span>
+        <span class="btn-label">예산 기록</span>
+        <span class="btn-desc">사용내역 입력</span>
+      </button>
+      <button class="quick-btn" onclick="sendQuickMessage('장비 대여 기록을 하고 싶어요')">
+        <span class="btn-icon">🏒</span>
+        <span class="btn-label">장비 대여</span>
+        <span class="btn-desc">스틱·볼 대여</span>
+      </button>
+      <button class="quick-btn" onclick="sendQuickMessage('인스타그램 홍보글을 작성해줘')">
+        <span class="btn-icon">📸</span>
+        <span class="btn-label">홍보글 작성</span>
+        <span class="btn-desc">인스타 캡션</span>
+      </button>
+      <button class="quick-btn" onclick="sendQuickMessage('동아리소개제 준비를 도와줘')">
+        <span class="btn-icon">🎪</span>
+        <span class="btn-label">소개제 준비</span>
+        <span class="btn-desc">행사 기획 도움</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Messages Container -->
+  <div class="messages" id="messages"></div>
+
+</div>
+
+<!-- Input Area -->
+<div class="input-area">
+  <!-- 파일 미리보기 (첨부 시 표시) -->
+  <div id="filePreviewArea" style="display:none">
+    <div class="upload-mode">
+      <button class="mode-btn active" id="modeReceipt" onclick="setMode('receipt')">🧾 영수증 → 회계 기록</button>
+      <button class="mode-btn" id="modeTraining" onclick="setMode('training')">📸 훈련 사진 → 인원 카운팅</button>
+      <button class="mode-btn" id="modeFile" onclick="setMode('file')">📁 드라이브 저장</button>
+    </div>
+    <div class="file-preview" id="filePreview">
+      <img id="previewImg" src="" alt="" style="display:none"/>
+      <span id="previewIcon" style="font-size:1.8rem">📄</span>
+      <div class="file-info">
+        <div class="file-name" id="previewName"></div>
+        <div class="file-size" id="previewSize"></div>
+      </div>
+      <button class="remove-btn" onclick="clearFile()">✕</button>
+    </div>
+  </div>
+
+  <div class="input-row">
+    <!-- 숨겨진 파일 input -->
+    <input type="file" id="fileInput" style="display:none"
+      accept="image/*,.pdf,.xlsx,.xls,.docx,.doc"
+      onchange="handleFileSelect(this.files[0])" />
+    <button id="attachBtn" onclick="document.getElementById('fileInput').click()" title="파일 첨부">
+      📎
+    </button>
+    <textarea
+      id="userInput"
+      placeholder="샤락이에게 물어보세요..."
+      rows="1"
+    ></textarea>
+    <button id="sendBtn" onclick="sendMessage()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    </button>
+  </div>
+  <div class="input-hint">Enter로 전송 · Shift+Enter 줄바꿈 · 📎 파일 첨부</div>
+</div>
+
+<!-- Password Modal -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal">
+    <h3>🔐 부원 인증</h3>
+    <p id="modalDesc">부원 전용 기능을 사용하려면 비밀번호를 입력하세요.</p>
+    <input type="password" id="passwordInput" placeholder="비밀번호 입력" />
+    <div class="modal-error" id="passwordError">비밀번호가 틀렸어요!</div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closePasswordModal()">취소</button>
+      <button class="btn-confirm" onclick="verifyPassword()">확인</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── 상태 ────────────────────────────────────────────────────────────────────
+  let conversationHistory = [];
+  let authLevel = 'guest';
+  let memberPassword = '';
+  let isLoading = false;
+  let selectedFile = null;
+  let uploadMode = 'receipt'; // 'receipt' | 'file'
+
+  const chatWrapper = document.getElementById('chatWrapper');
+  const messagesEl = document.getElementById('messages');
+  const welcomeEl = document.getElementById('welcomeScreen');
+  const userInputEl = document.getElementById('userInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  // ── 파일 선택 처리 ──────────────────────────────────────────────────────────
+  function handleFileSelect(file) {
+    if (!file) return;
+    selectedFile = file;
+    document.getElementById('filePreviewArea').style.display = 'block';
+    document.getElementById('previewName').textContent = file.name;
+    document.getElementById('previewSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
+
+    // 이미지면 미리보기 표시
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        document.getElementById('previewImg').src = e.target.result;
+        document.getElementById('previewImg').style.display = 'block';
+        document.getElementById('previewIcon').style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+      // 이미지면 기본 모드를 영수증으로
+      setMode('receipt');
+    } else {
+      document.getElementById('previewImg').style.display = 'none';
+      document.getElementById('previewIcon').style.display = 'block';
+      setMode('file');
+    }
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    document.getElementById('filePreviewArea').style.display = 'none';
+    document.getElementById('fileInput').value = '';
+  }
+
+  function setMode(mode) {
+    uploadMode = mode;
+    document.getElementById('modeReceipt').classList.toggle('active', mode === 'receipt');
+    document.getElementById('modeTraining').classList.toggle('active', mode === 'training');
+    document.getElementById('modeFile').classList.toggle('active', mode === 'file');
+  }
+
+  // ── 파일 업로드 실행 ─────────────────────────────────────────────────────────
+  async function uploadFile() {
+    if (!selectedFile) return null;
+    // 이 함수는 더 이상 사용되지 않음 (sendMessage에서 직접 처리)
+    return null;
+  }
+
+  // ── 텍스트에어리어 자동 높이 ─────────────────────────────────────────────────
+  userInputEl.addEventListener('input', () => {
+    userInputEl.style.height = 'auto';
+    userInputEl.style.height = Math.min(userInputEl.scrollHeight, 120) + 'px';
+  });
+
+  userInputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // ── 빠른 버튼 ────────────────────────────────────────────────────────────────
+  function sendQuickMessage(text) {
+    userInputEl.value = text;
+    sendMessage();
+  }
+
+  // ── 메시지 전송 ──────────────────────────────────────────────────────────────
+  async function sendMessage() {
+    const text = userInputEl.value.trim();
+    const hasFile = !!selectedFile;
+    if (!text && !hasFile) return;
+    if (isLoading) return;
+
+    if (welcomeEl.style.display !== 'none') welcomeEl.style.display = 'none';
+    isLoading = true;
+    sendBtn.disabled = true;
+
+    // ── 파일이 있으면 먼저 업로드 ────────────────────────────────────────────
+    if (hasFile) {
+      // 게스트면 비밀번호 모달 띄우고 인증 후 자동 재전송
+      if (authLevel !== 'member') {
+        isLoading = false; sendBtn.disabled = false;
+        openPasswordModal('파일 업로드는 부원 전용 기능이에요! 🔐 비밀번호를 입력하면 바로 업로드할게요.', () => sendMessage());
+        return;
+      }
+
+      const fileToUpload = selectedFile; // clearFile() 전에 저장
+      const fileName = fileToUpload.name;
+      appendMessage('user', text || `📎 ${fileName} 첨부`);
+      clearFile();
+      userInputEl.value = '';
+      userInputEl.style.height = 'auto';
+
+      // FormData 직접 생성 (clearFile 이후라 selectedFile 사용 불가)
+      const formData = new FormData();
+      formData.append('file', fileToUpload);
+      formData.append('password', memberPassword);
+      formData.append('mode', uploadMode);
+
+      const typingId = showTyping();
+      let result;
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        result = await res.json();
+      } catch {
+        removeTyping(typingId);
+        appendMessage('bot', '업로드 중 오류가 발생했어요. 다시 시도해주세요.');
+        isLoading = false; sendBtn.disabled = false; return;
+      }
+      removeTyping(typingId);
+
+      if (!result) { isLoading = false; sendBtn.disabled = false; return; }
+
+      if (result.error) {
+        appendMessage('bot', `❌ ${result.error}`);
+        isLoading = false; sendBtn.disabled = false; return;
+      }
+
+      // 훈련 사진 인원 카운팅 결과
+      if (result.type === 'training_photo') {
+        appendMessage('bot', result.message);
+        if (result.count) {
+          const ctx = `훈련 사진 분석 완료. 인식된 인원: ${result.count.count}명 (신뢰도: ${result.count.confidence}). 훈련 기록을 저장하려면 날짜와 훈련 내용을 알려줘.`;
+          conversationHistory.push({ role: 'assistant', content: result.message });
+          conversationHistory.push({ role: 'user', content: ctx });
+        }
+        isLoading = false; sendBtn.disabled = false;
+        userInputEl.focus();
+        return;
+      }
+
+      // 영수증 OCR 결과 처리
+      if (result.type === 'receipt' && result.ocr) {
+        appendOcrConfirmCard(result.ocr, result.driveFile);
+        isLoading = false; sendBtn.disabled = false;
+        userInputEl.focus();
+        return;
+      }
+
+      // 일반 파일 업로드
+      appendMessage('bot', result.message);
+      conversationHistory.push({ role: 'assistant', content: result.message });
+      isLoading = false; sendBtn.disabled = false;
+      userInputEl.focus();
+      return;
+    }
+
+    // ── 일반 텍스트 메시지 ───────────────────────────────────────────────────
+    appendMessage('user', text);
+    conversationHistory.push({ role: 'user', content: text });
+    userInputEl.value = '';
+    userInputEl.style.height = 'auto';
+
+    // 타이핑 인디케이터
+    const typingId = showTyping();
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: conversationHistory,
+          password: memberPassword,
+        }),
+      });
+
+      const data = await res.json();
+      removeTyping(typingId);
+
+      if (data.error) {
+        appendMessage('bot', data.error);
+      } else {
+        appendMessage('bot', data.reply);
+        conversationHistory.push({ role: 'assistant', content: data.reply });
+        authLevel = data.authLevel;
+        updateAuthBadge();
+
+        // 봇이 인증을 요구하는 답변을 했으면 자동으로 비밀번호 모달 띄우기
+        if (authLevel !== 'member') {
+          const authKeywords = ['부원 인증', '비밀번호', '인증이 필요', '인증을 해', '인증 후', '인증하고', '인증해야'];
+          const needsAuth = authKeywords.some(kw => data.reply.includes(kw));
+          if (needsAuth) {
+            const lastUserMsg = text;
+            setTimeout(() => {
+              openPasswordModal(
+                '부원 인증이 필요한 기능이에요! 🔐 비밀번호를 입력하면 바로 이어서 진행할게요.',
+                () => continueAfterAuth(lastUserMsg)
+              );
+            }, 600);
+          }
+        }
+      }
+    } catch {
+      removeTyping(typingId);
+      appendMessage('bot', '네트워크 오류가 발생했어요. 서버가 실행 중인지 확인해주세요! 😅');
+    } finally {
+      isLoading = false;
+      sendBtn.disabled = false;
+      userInputEl.focus();
+    }
+  }
+
+  // ── 메시지 렌더링 ─────────────────────────────────────────────────────────────
+  function appendMessage(role, content) {
+    const msg = document.createElement('div');
+    msg.className = `message ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = role === 'user' ? '🙂' : '🥍';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = content;
+
+    msg.appendChild(avatar);
+    msg.appendChild(bubble);
+    messagesEl.appendChild(msg);
+    scrollToBottom();
+  }
+
+  // ── 타이핑 인디케이터 ─────────────────────────────────────────────────────────
+  let typingCounter = 0;
+
+  function showTyping() {
+    const id = ++typingCounter;
+    const msg = document.createElement('div');
+    msg.className = 'message bot';
+    msg.id = `typing-${id}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = '🥍';
+
+    const indicator = document.createElement('div');
+    indicator.className = 'typing-indicator';
+    indicator.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+
+    msg.appendChild(avatar);
+    msg.appendChild(indicator);
+    messagesEl.appendChild(msg);
+    scrollToBottom();
+    return id;
+  }
+
+  function removeTyping(id) {
+    const el = document.getElementById(`typing-${id}`);
+    if (el) el.remove();
+  }
+
+  function scrollToBottom() {
+    chatWrapper.scrollTop = chatWrapper.scrollHeight;
+  }
+
+  // ── 인증 배지 업데이트 ────────────────────────────────────────────────────────
+  function updateAuthBadge() {
+    const badge = document.getElementById('authBadge');
+    if (authLevel === 'member') {
+      badge.textContent = '✅ 부원';
+      badge.classList.add('member');
+    } else {
+      badge.textContent = '🔓 게스트';
+      badge.classList.remove('member');
+    }
+  }
+
+  // ── 인증 후 대화 이어가기 ──────────────────────────────────────────────────────
+  async function continueAfterAuth(originalMsg) {
+    // 1. 히스토리에서 마지막 봇의 "인증 필요" 메시지 제거 (stale)
+    if (conversationHistory.length > 0 &&
+        conversationHistory[conversationHistory.length - 1].role === 'assistant') {
+      conversationHistory.pop();
+    }
+
+    // 2. 인증 완료 + 원래 요청 이어가라는 숨김 메시지 주입 (화면에는 표시 안 함)
+    const continueMsg = `부원 인증이 완료됐어. "${originalMsg}" 요청을 지금 바로 이어서 처리해줘. 필요한 정보가 있으면 물어봐.`;
+    conversationHistory.push({ role: 'user', content: continueMsg });
+
+    // 3. GPT 호출
+    if (isLoading) return;
+    isLoading = true;
+    sendBtn.disabled = true;
+    const typingId = showTyping();
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: conversationHistory, password: memberPassword, authLevel }),
+      });
+      const data = await res.json();
+      removeTyping(typingId);
+      const reply = data.reply || data.error || '오류가 발생했어요.';
+      conversationHistory.push({ role: 'assistant', content: reply });
+      appendMessage('bot', reply);
+    } catch {
+      removeTyping(typingId);
+      appendMessage('bot', '네트워크 오류가 발생했어요.');
+    } finally {
+      isLoading = false;
+      sendBtn.disabled = false;
+      userInputEl.focus();
+    }
+  }
+
+  // ── OCR 확인 카드 ─────────────────────────────────────────────────────────────
+  function appendOcrConfirmCard(ocr, driveFile) {
+    const messagesEl = document.getElementById('messages');
+
+    const msg = document.createElement('div');
+    msg.className = 'message bot';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = '🥍';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+
+    const card = document.createElement('div');
+    card.className = 'ocr-card';
+
+    // 드라이브 저장 여부 안내
+    const driveNote = driveFile
+      ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">📁 드라이브 저장 완료 (${driveFile.name})</div>`
+      : '';
+
+    card.innerHTML = `
+      <div class="ocr-card-title">🧾 영수증 인식 결과 — 맞나요?</div>
+      ${driveNote}
+      <div class="ocr-field">
+        <label>거래일시</label>
+        <input id="ocr_date"     type="text" value="${ocr.date     || ''}" placeholder="YYYY-MM-DD" />
+      </div>
+      <div class="ocr-field">
+        <label>분류</label>
+        <input id="ocr_category" type="text" value="${ocr.category || ''}" placeholder="식비, 장비비 등" />
+      </div>
+      <div class="ocr-field">
+        <label>거래금액</label>
+        <input id="ocr_amount"   type="number" value="${ocr.amount || ''}" placeholder="숫자만 입력" />
+      </div>
+      <div class="ocr-field">
+        <label>대상</label>
+        <input id="ocr_target"   type="text" value="${ocr.target   || ''}" placeholder="환급 대상 부원 이름" />
+      </div>
+      <div class="ocr-field">
+        <label>내용</label>
+        <input id="ocr_content"  type="text" value="${ocr.content  || ''}" placeholder="결제 내용" />
+      </div>
+      <div class="ocr-field">
+        <label>비고</label>
+        <input id="ocr_note"     type="text" value="${ocr.note     || ''}" placeholder="(선택)" />
+      </div>
+      <div class="ocr-card-btns">
+        <button class="ocr-btn-cancel"  onclick="cancelOcrCard(this)">취소</button>
+        <button class="ocr-btn-confirm" onclick="confirmOcrSave(this)">✅ 기록하기</button>
+      </div>
+    `;
+
+    bubble.appendChild(card);
+    msg.appendChild(avatar);
+    msg.appendChild(bubble);
+    messagesEl.appendChild(msg);
+    scrollToBottom();
+  }
+
+  function cancelOcrCard(btn) {
+    const card = btn.closest('.ocr-card');
+    card.classList.add('done');
+    card.querySelector('.ocr-card-btns').innerHTML = '<span style="font-size:0.78rem;color:var(--text-muted);">기록 취소됨</span>';
+  }
+
+  async function confirmOcrSave(btn) {
+    const card = btn.closest('.ocr-card');
+    const date     = card.querySelector('#ocr_date').value.trim();
+    const category = card.querySelector('#ocr_category').value.trim();
+    const amount   = card.querySelector('#ocr_amount').value.trim();
+    const target   = card.querySelector('#ocr_target').value.trim();
+    const content  = card.querySelector('#ocr_content').value.trim();
+    const note     = card.querySelector('#ocr_note').value.trim();
+
+    if (!amount) {
+      card.querySelector('#ocr_amount').style.borderColor = '#f44336';
+      card.querySelector('#ocr_amount').focus();
+      return;
+    }
+
+    // 카드 비활성화
+    card.classList.add('done');
+    card.querySelector('.ocr-card-btns').innerHTML = '<span style="font-size:0.78rem;color:var(--text-muted);">저장 중...</span>';
+
+    // GPT에게 저장 지시 (히스토리에는 보이지 않는 시스템 메시지 형식으로)
+    const saveMsg = `영수증 OCR 확인 완료. 다음 값으로 save_budget 툴을 즉시 호출해서 회계에 기록해줘. 다른 질문 없이 바로 저장해줘:\n거래일시=${date}, 분류=${category}, 거래금액=${amount}, 대상=${target}, 내용=${content}, 비고=${note}`;
+
+    conversationHistory.push({ role: 'user', content: saveMsg });
+
+    const typingId = showTyping();
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: conversationHistory,
+          password: memberPassword,
+          authLevel,
+        }),
+      });
+      const data = await res.json();
+      removeTyping(typingId);
+      const reply = data.reply || '저장 완료!';
+      conversationHistory.push({ role: 'assistant', content: reply });
+      appendMessage('bot', reply);
+      // 카드 상태 업데이트
+      card.querySelector('.ocr-card-btns').innerHTML = '<span style="font-size:0.78rem;color:#4caf50;">✅ 기록 완료</span>';
+    } catch {
+      removeTyping(typingId);
+      appendMessage('bot', '저장 중 오류가 발생했어요. 다시 시도해주세요.');
+      card.classList.remove('done');
+      card.querySelector('.ocr-card-btns').innerHTML = `
+        <button class="ocr-btn-cancel"  onclick="cancelOcrCard(this)">취소</button>
+        <button class="ocr-btn-confirm" onclick="confirmOcrSave(this)">✅ 기록하기</button>
+      `;
+    }
+  }
+
+  // ── 비밀번호 모달 ─────────────────────────────────────────────────────────────
+  let _modalCallback = null;
+
+  function openPasswordModal(description, callback) {
+    if (description) {
+      document.getElementById('modalDesc').textContent = description;
+    } else {
+      document.getElementById('modalDesc').textContent = '부원 전용 기능을 사용하려면 비밀번호를 입력하세요.';
+    }
+    _modalCallback = callback || null;
+    document.getElementById('passwordModal').classList.add('show');
+    document.getElementById('passwordInput').value = '';
+    document.getElementById('passwordError').style.display = 'none';
+    setTimeout(() => document.getElementById('passwordInput').focus(), 100);
+  }
+
+  function closePasswordModal() {
+    document.getElementById('passwordModal').classList.remove('show');
+    _modalCallback = null;
+  }
+
+  async function verifyPassword() {
+    const pw = document.getElementById('passwordInput').value;
+    if (!pw) return;
+
+    try {
+      const res = await fetch('/api/verify-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        memberPassword = pw;
+        authLevel = 'member';
+        updateAuthBadge();
+        const cb = _modalCallback;
+        closePasswordModal();
+        if (welcomeEl.style.display !== 'none') welcomeEl.style.display = 'none';
+        if (cb) {
+          // 콜백이 있으면 인증 후 바로 재시도 (별도 메시지 없이)
+          cb();
+        } else {
+          appendMessage('bot', '부원 인증 완료! 🎉 이제 모든 기능을 이용하실 수 있어요.');
+          conversationHistory.push({ role: 'assistant', content: '부원 인증 완료! 🎉 이제 모든 기능을 이용하실 수 있어요.' });
+        }
+      } else {
+        document.getElementById('passwordError').style.display = 'block';
+      }
+    } catch {
+      document.getElementById('passwordError').style.display = 'block';
+    }
+  }
+
+  document.getElementById('passwordInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') verifyPassword();
+  });
+
+  document.getElementById('passwordModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('passwordModal')) closePasswordModal();
+  });
+
+  // ── 클립보드 이미지 붙여넣기 (Ctrl+V / Cmd+V) ──────────────────────────────
+  document.addEventListener('paste', (e) => {
+    // 비밀번호 입력창에서 붙여넣기할 땐 무시
+    if (document.activeElement === document.getElementById('passwordInput')) return;
+
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          // 파일명이 없으면 timestamp로 생성
+          const ext = item.type.split('/')[1] || 'png';
+          const named = new File([file], `clipboard_${Date.now()}.${ext}`, { type: item.type });
+          handleFileSelect(named);
+
+          // 포커스를 입력창으로
+          userInputEl.focus();
+        }
+        break;
+      }
+    }
+  });
+</script>
+</body>
+</html>
