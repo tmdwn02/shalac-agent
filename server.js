@@ -2024,6 +2024,91 @@ cron.schedule('0 9 * * *', async () => {
   console.log('✅ 알림 체크 완료');
 }, { timezone: 'Asia/Seoul' });
 
+// ─── 학기말 리포트 ────────────────────────────────────────────────────────────
+async function sendSemesterReport(semesterLabel, endMonth) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const startMonth = endMonth === 6 ? 3 : 9; // 1학기: 3~6월, 2학기: 9~12월
+
+  try {
+    // 해당 학기 월 범위
+    const months = [];
+    for (let m = startMonth; m <= endMonth; m++) {
+      months.push(`${year}-${String(m).padStart(2,'0')}`);
+    }
+
+    // ① 예산
+    const budgetRows = await readSheet(SPREADSHEET_IDS.budget, '시트1!A:G');
+    const budgetData = (budgetRows || []).slice(1).filter(r => r[0] && r[2]);
+    const semBudget = budgetData.filter(r => months.some(m => String(r[0]).startsWith(m)));
+    const income  = semBudget.filter(r => parseFloat(String(r[2]).replace(/[^0-9\-]/g,'')) > 0);
+    const expense = semBudget.filter(r => parseFloat(String(r[2]).replace(/[^0-9\-]/g,'')) < 0);
+    const totalIncome  = income.reduce((s,r) => s + Math.abs(parseFloat(String(r[2]).replace(/[^0-9\-]/g,''))||0), 0);
+    const totalExpense = expense.reduce((s,r) => s + Math.abs(parseFloat(String(r[2]).replace(/[^0-9\-]/g,''))||0), 0);
+    const lastBalance  = budgetData.length > 0 ? parseInt(String(budgetData[budgetData.length-1][5]||'').replace(/[^0-9\-]/g,''))||0 : 0;
+
+    const expenseByCategory = {};
+    for (const r of expense) {
+      const cat = r[1] || '기타';
+      expenseByCategory[cat] = (expenseByCategory[cat] || 0) + Math.abs(parseFloat(String(r[2]).replace(/[^0-9\-]/g,''))||0);
+    }
+    const topExpenses = Object.entries(expenseByCategory)
+      .sort((a,b) => b[1]-a[1]).slice(0,5)
+      .map(([k,v]) => `  - ${k}: ${v.toLocaleString()}원`).join('\n') || '  (없음)';
+
+    // ② 훈련
+    const trainingRows = await readSheet(SPREADSHEET_IDS.training, '훈련 내용!A:E');
+    const trainingData = (trainingRows || []).slice(1).filter(r => r[0]);
+    const semTraining = trainingData.filter(r => months.some(m => String(r[0]).startsWith(m)));
+    const totalSessions = semTraining.length;
+    const totalParticipants = semTraining.reduce((s,r) => s + (parseInt(r[1])||0), 0);
+    const avgParticipants = totalSessions > 0 ? (totalParticipants / totalSessions).toFixed(1) : 0;
+
+    // 출석 순위 (상위 5명)
+    const attendeeCount = {};
+    for (const r of semTraining) {
+      const names = (r[2] || '').split(/[,\s]+/).filter(n => n.trim());
+      for (const n of names) attendeeCount[n] = (attendeeCount[n] || 0) + 1;
+    }
+    const topAttendees = Object.entries(attendeeCount)
+      .sort((a,b) => b[1]-a[1]).slice(0,5)
+      .map(([n,c], i) => `  ${i+1}위. ${n} (${c}회)`).join('\n') || '  (없음)';
+
+    const subject = `[샤락] 📋 ${year} ${semesterLabel} 학기말 리포트`;
+    const body = `안녕하세요! 샤락 에이전트가 ${year} ${semesterLabel} 활동을 정리했어요 🥍
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+💰 학기 예산 현황
+━━━━━━━━━━━━━━━━━━━━━━━━
+• 총 수입:   ${totalIncome.toLocaleString()}원
+• 총 지출:   ${totalExpense.toLocaleString()}원
+• 현재 잔액: ${lastBalance.toLocaleString()}원
+
+주요 지출 항목:
+${topExpenses}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+🏃 학기 훈련 현황
+━━━━━━━━━━━━━━━━━━━━━━━━
+• 총 훈련 횟수:   ${totalSessions}회
+• 평균 참여 인원: ${avgParticipants}명
+• 총 참여 연인원: ${totalParticipants}명
+
+이번 학기 출석 상위 5명:
+${topAttendees}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+${semesterLabel} 한 학기 정말 수고했어요! 💪
+샤락 에이전트 드림 🥍
+`;
+
+    await sendEmailNotification(subject, body);
+    console.log(`📋 ${year} ${semesterLabel} 학기말 리포트 발송 완료`);
+  } catch (e) {
+    console.error('sendSemesterReport error:', e.message);
+  }
+}
+
 // 매월 말일 오후 11시: 월간 리포트
 cron.schedule('0 23 28-31 * *', async () => {
   const now = new Date();
@@ -2069,7 +2154,21 @@ cron.schedule('0 9 * * 1', async () => {
   }
 }, { timezone: 'Asia/Seoul' });
 
-console.log('🔔 선제적 알림 스케줄 등록됨 (매일 오전 9시 / 매월 말일 오후 11시 / 시험기간 투표 알림)');
+// 학기말 리포트 (6월 2주, 12월 2주 월요일 오전 9시)
+cron.schedule('0 9 * * 1', async () => {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+  const week = Math.ceil(day / 7);
+
+  if ((month === 6 || month === 12) && week === 2) {
+    const semesterLabel = month === 6 ? '1학기' : '2학기';
+    console.log(`📋 학기말 리포트 생성 중: ${semesterLabel}`);
+    await sendSemesterReport(semesterLabel, month);
+  }
+}, { timezone: 'Asia/Seoul' });
+
+console.log('🔔 선제적 알림 스케줄 등록됨 (매일 오전 9시 / 매월 말일 오후 11시 / 시험기간 투표 알림 / 학기말 리포트)');
 
 app.listen(PORT, async () => {
   console.log(`🥍 샤락 에이전트 서버 실행 중: http://localhost:${PORT}`);
