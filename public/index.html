@@ -906,7 +906,9 @@
       if (data.error) {
         appendMessage('bot', data.error);
       } else {
-        appendMessage('bot', data.reply);
+        const agentLabels = { operations: '⚙️ 운영', knowledge: '📚 지식', analytics: '📊 분석', general: '💬 일반' };
+        const agentLabel = agentLabels[data.agentType] || '';
+        appendMessage('bot', data.reply, agentLabel);
         conversationHistory.push({ role: 'assistant', content: data.reply });
         authLevel = data.authLevel;
         updateAuthBadge();
@@ -938,7 +940,7 @@
   }
 
   // ── 메시지 렌더링 ─────────────────────────────────────────────────────────────
-  function appendMessage(role, content) {
+  function appendMessage(role, content, agentLabel) {
     const msg = document.createElement('div');
     msg.className = `message ${role}`;
 
@@ -949,6 +951,13 @@
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
     bubble.textContent = content;
+
+    if (role === 'bot' && agentLabel) {
+      const tag = document.createElement('div');
+      tag.style.cssText = 'font-size:0.65rem;color:var(--text-muted);margin-top:6px;opacity:0.7;';
+      tag.textContent = `${agentLabel} 에이전트`;
+      bubble.appendChild(tag);
+    }
 
     msg.appendChild(avatar);
     msg.appendChild(bubble);

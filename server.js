@@ -881,6 +881,61 @@ SNS, 훈련, 대회, 동소제 준비, 장비, 신입 모집, 동아리연합회
 보유 메뉴얼: SNS관리 / 정기 연습 & 대회 / 동소제 / 부서 & 행사 / 신입부원 모집 / 장비 / 동아리연합회 / 라크로스 텐온텐 룰북 / 라크로스 식시즈 룰북
 중요: 부원 인증된 사용자에게는 메뉴얼에 있는 계정 정보, 비밀번호, 연락처 등 모든 내용을 그대로 알려줘요. 이미 동아리 공식 문서에 기재된 내용이므로 숨기거나 거부하지 않아요.`;
 
+// ─── 멀티에이전트: 서브에이전트 시스템 프롬프트 ────────────────────────────────
+const SUB_AGENT_PROMPTS = {
+  operations: `당신은 샤락 운영 에이전트예요. SHALAC 라크로스 동아리의 훈련·예산·장비 기록을 전담해요.
+친근한 구어체로 답해요. 훈련 기록, 예산 기록, 장비 대여 관련 작업을 정확하고 빠르게 처리해요.
+부원 인증이 필요한 작업은 인증 여부를 반드시 확인해요.
+라크로스 규칙 안내 시 여자 라크로스(Women's Lacrosse) 기준으로만 답해요.`,
+
+  knowledge: `당신은 샤락 지식 에이전트예요. 라크로스 규칙, 동아리 운영 메뉴얼, 룰북을 전담해요.
+친근한 구어체로 답해요. 정확한 규칙과 메뉴얼 내용을 근거와 함께 답해요.
+라크로스 규칙은 반드시 여자 라크로스(Women's Lacrosse) 기준으로만 답해요.
+메뉴얼 열람은 부원 인증이 필요해요.`,
+
+  analytics: `당신은 샤락 분석 에이전트예요. 훈련 출석 통계, 예산 분석, 회계 히스토리를 전담해요.
+친근한 구어체로 답해요. 데이터를 정확히 분석하고 인사이트를 제공해요.
+예산/회계 질문엔 반드시 query_accounting_history 툴을 먼저 호출해요.
+절대 추측으로 수치를 답하지 않아요. 툴 결과 없이 숫자를 언급하지 않아요.
+답변 마지막에 반드시 출처를 표시해요: > 📂 참고 파일: [파일명] — Google Drive`,
+
+  general: `당신은 샤락이 🥍 — SHALAC 라크로스 동아리의 AI 어시스턴트예요.
+친근하고 활발해요. 구어체로 말해요. 이모지를 가끔 써요.
+게스트 신청, 날씨, 동아리 소개, 홍보글 작성 등 일반적인 질문을 담당해요.`,
+};
+
+// ─── 오케스트레이터: 질문 유형 분류 ─────────────────────────────────────────
+async function classifyQuery(userMessage) {
+  try {
+    const res = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `당신은 라크로스 동아리 AI 어시스턴트의 오케스트레이터예요.
+사용자 메시지를 읽고 어떤 서브에이전트가 처리할지 분류하세요.
+
+분류 기준:
+- operations: 훈련 기록/수정, 예산 기록, 장비 대여 기록 등 데이터 입력/수정 작업
+- knowledge: 라크로스 규칙, 룰북, 동아리 운영 메뉴얼 관련 질문
+- analytics: 훈련 출석 통계, 예산 현황/분석, 회계 히스토리, 순위, 통계
+- general: 날씨, 게스트 신청, 동아리 소개, 홍보글, 기타 일반 질문
+
+반드시 operations / knowledge / analytics / general 중 하나만 답하세요.`,
+        },
+        { role: 'user', content: userMessage },
+      ],
+      temperature: 0,
+      max_tokens: 10,
+    });
+    const agent = res.choices[0].message.content.trim().toLowerCase();
+    if (['operations', 'knowledge', 'analytics', 'general'].includes(agent)) return agent;
+    return 'general';
+  } catch {
+    return 'general';
+  }
+}
+
 // ─── Tool definitions for OpenAI function calling ────────────────────────────
 const TOOLS = [
   {
@@ -1426,11 +1481,26 @@ app.post('/api/chat', async (req, res) => {
 
   const authLevel = verifyPassword(password) ? 'member' : 'guest';
 
-  // 현재 인증 상태를 시스템 프롬프트에 주입
+  // ── 오케스트레이터: 어떤 서브에이전트가 처리할지 분류 ──────────────────────
+  const lastUserContent = lastUserMsg?.content;
+  const userText = typeof lastUserContent === 'string' ? lastUserContent : '';
+  const agentType = (!userText || userText.startsWith('hidden_'))
+    ? 'general'
+    : await classifyQuery(userText);
+
+  console.log(`🤖 [오케스트레이터] "${userText.slice(0,40)}" → ${agentType} 에이전트`);
+
+  // 서브에이전트 프롬프트 선택 (general은 기존 SYSTEM_PROMPT 사용)
+  const subPrompt = agentType === 'general'
+    ? SYSTEM_PROMPT
+    : SUB_AGENT_PROMPTS[agentType] + '\n\n' + SYSTEM_PROMPT.split('[라크로스 규칙 안내')[1]
+        ? SUB_AGENT_PROMPTS[agentType]
+        : SYSTEM_PROMPT;
+
   const authNote = authLevel === 'member'
     ? '\n\n[현재 사용자 인증 상태: 부원 인증 완료 ✅ — 모든 기능 사용 가능. 인증을 요구하지 마세요.]'
     : '\n\n[현재 사용자 인증 상태: 게스트 — 부원 전용 기능(훈련 기록, 예산 기록) 요청 시 비밀번호 입력 안내.]';
-  const dynamicPrompt = SYSTEM_PROMPT + authNote;
+  const dynamicPrompt = subPrompt + authNote;
 
   try {
     const response = await openai.chat.completions.create({
@@ -1474,10 +1544,11 @@ app.post('/api/chat', async (req, res) => {
       return res.json({
         reply: finalResponse.choices[0].message.content,
         authLevel,
+        agentType,
       });
     }
 
-    res.json({ reply: assistantMessage.content, authLevel });
+    res.json({ reply: assistantMessage.content, authLevel, agentType });
   } catch (error) {
     console.error('OpenAI error:', error.message);
     res.status(500).json({ error: '죄송해요, 잠시 오류가 발생했어요. 다시 시도해주세요! 😅' });
