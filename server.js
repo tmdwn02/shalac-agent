@@ -411,14 +411,14 @@ async function saveTraining(data) {
   const ok = await appendSheet(SPREADSHEET_IDS.training, '훈련 내용!A:E', row);
   if (!ok) return { success: false, message: '저장 중 오류가 발생했어요.' };
 
-  // 구글 캘린더에도 자동 등록
-  await createCalendarEvent({
+  // 구글 캘린더 등록은 백그라운드로
+  createCalendarEvent({
     title: `🥍 SHALAC 훈련`,
     date,
     startTime: '18:00',
     endTime: '20:00',
     description: `참여인원: ${participants}명${attendees ? '\n참여자: ' + attendees : ''}\n내용: ${content}`,
-  });
+  }).catch(() => {});
 
   return { success: true, message: `훈련 기록 저장 완료! 💪 ${date} 훈련 기록됐어요.` };
 }
@@ -503,11 +503,11 @@ async function saveBudget(data) {
   const ok = await appendSheet(SPREADSHEET_IDS.budget, '시트1!A:G', row);
   if (!ok) return { success: false, message: '저장 중 오류가 발생했어요.' };
 
-  // 운영진에게 확인 이메일 발송
-  await sendEmailNotification(
+  // 운영진 이메일은 백그라운드로 (응답 속도에 영향 없도록)
+  sendEmailNotification(
     `[샤락] 예산 기록 알림: ${content}`,
     `예산 내역이 기록되었어요.\n\n거래일시: ${date}\n분류: ${category || '-'}\n금액: ${amtNum.toLocaleString()}원\n대상: ${target || '-'}\n내용: ${content}\n비고: ${note || '-'}\n\n거래 후 잔액: ${newBalance.toLocaleString()}원`
-  );
+  ).catch(() => {});
 
   return { success: true, message: `예산 기록 완료! 💰 ${content} ${amtNum.toLocaleString()}원 → 잔액 ${newBalance.toLocaleString()}원` };
 }
