@@ -2056,6 +2056,42 @@ app.get('/api/guest-action', async (req, res) => {
 });
 
 // 알림 테스트용 (부원 인증 필요)
+// Drive 상태 확인 + 테스트 파일 업로드
+app.post('/api/test-drive', async (req, res) => {
+  const { password } = req.body;
+  if (!verifyPassword(password)) return res.status(403).json({ error: '인증 필요' });
+  try {
+    // 폴더 ID 현황 반환
+    const folderStatus = {
+      root:      DRIVE_FOLDERS.root      || '❌ 미생성',
+      receipts:  DRIVE_FOLDERS.receipts  || '❌ 미생성',
+      training:  DRIVE_FOLDERS.training  || '❌ 미생성',
+      general:   DRIVE_FOLDERS.general   || '❌ 미생성',
+    };
+
+    // 테스트 텍스트 파일을 영수증 폴더에 업로드
+    if (!DRIVE_FOLDERS.receipts) {
+      return res.json({ ok: false, folders: folderStatus, message: '영수증 폴더 ID가 없어요. 서버 재시작 후 다시 시도하세요.' });
+    }
+
+    const testContent = Buffer.from(`SHALAC Drive 테스트\n업로드 시각: ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
+    const uploaded = await uploadToDrive(testContent, 'drive_test.txt', 'text/plain', DRIVE_FOLDERS.receipts);
+
+    res.json({
+      ok: true,
+      folders: folderStatus,
+      uploaded: {
+        id: uploaded.id,
+        name: uploaded.name,
+        link: uploaded.webViewLink,
+      },
+      message: '✅ Drive 업로드 성공! 아래 링크에서 확인하세요.',
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message, folders: DRIVE_FOLDERS });
+  }
+});
+
 app.post('/api/test-alerts', async (req, res) => {
   const { password } = req.body;
   if (!verifyPassword(password)) return res.status(403).json({ error: '인증 필요' });
