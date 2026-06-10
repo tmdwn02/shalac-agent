@@ -1741,7 +1741,9 @@ app.post('/api/chat', async (req, res) => {
   const authNote = authLevel === 'member'
     ? '\n\n[현재 사용자 인증 상태: 부원 인증 완료 ✅ — 모든 기능 사용 가능. 인증을 요구하지 마세요.]'
     : '\n\n[현재 사용자 인증 상태: 게스트 — 부원 전용 기능(훈련 기록, 예산 기록) 요청 시 비밀번호 입력 안내.]';
-  const dynamicPrompt = subPrompt + authNote;
+  const now = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+  const dateNote = `\n\n[오늘 날짜: ${now}] 날짜·요일·"다음 주" 등 시간 관련 질문은 이 날짜를 기준으로 정확히 답하세요.`;
+  const dynamicPrompt = subPrompt + authNote + dateNote;
 
   try {
     const response = await openai.chat.completions.create({
