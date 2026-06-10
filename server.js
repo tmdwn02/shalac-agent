@@ -1798,11 +1798,12 @@ app.post('/api/chat', async (req, res) => {
 
 // ─── Drive 폴더 ID 매핑 ───────────────────────────────────────────────────────
 // 서비스 계정 소유 드라이브 폴더 ID (서버 시작 시 자동 생성)
+// 실제 구글 계정 폴더 (서비스 계정과 공유됨 — quota 문제 해결)
 const DRIVE_FOLDERS = {
-  root:      null,  // 샤락 에이전트 루트 폴더
-  receipts:  null,  // 영수증
-  training:  null,  // 훈련 사진
-  general:   null,  // 일반 파일
+  root:      process.env.DRIVE_FOLDER_ID || '1BqZ2aXCy4Yv1Svjad23yN993RtlcvJ5J',
+  receipts:  process.env.DRIVE_FOLDER_ID || '1BqZ2aXCy4Yv1Svjad23yN993RtlcvJ5J',
+  training:  process.env.DRIVE_FOLDER_ID || '1BqZ2aXCy4Yv1Svjad23yN993RtlcvJ5J',
+  general:   process.env.DRIVE_FOLDER_ID || '1BqZ2aXCy4Yv1Svjad23yN993RtlcvJ5J',
 };
 
 // ─── 서비스 계정 드라이브 폴더 생성/조회 ─────────────────────────────────────
@@ -1824,36 +1825,8 @@ async function getOrCreateFolder(drive, name, parentId = null) {
 
 async function initDriveFolders() {
   try {
-    const auth = await getAuthClient();
-    const drive = google.drive({ version: 'v3', auth });
-    const shareEmail = process.env.ADMIN_EMAIL || process.env.GMAIL_USER;
-
-    // 폴더 구조 생성: 샤락 에이전트/ ├── 영수증/ ├── 훈련사진/ └── 일반파일/
-    DRIVE_FOLDERS.root     = await getOrCreateFolder(drive, '샤락 에이전트');
-    DRIVE_FOLDERS.receipts = await getOrCreateFolder(drive, '영수증',   DRIVE_FOLDERS.root);
-    DRIVE_FOLDERS.training = await getOrCreateFolder(drive, '훈련사진', DRIVE_FOLDERS.root);
-    DRIVE_FOLDERS.general  = await getOrCreateFolder(drive, '일반파일', DRIVE_FOLDERS.root);
-
-    // 루트 폴더 공유 대상 목록
-    const shareTargets = [
-      shareEmail,
-      process.env.DRIVE_SHARE_EMAIL,  // 추가 공유 계정
-    ].filter(Boolean);
-
-    for (const email of shareTargets) {
-      try {
-        await drive.permissions.create({
-          fileId: DRIVE_FOLDERS.root,
-          requestBody: { role: 'writer', type: 'user', emailAddress: email },
-          sendNotificationEmail: false,
-        });
-        console.log(`📂 드라이브 폴더 공유 완료 → ${email}`);
-      } catch (e) {
-        if (!e.message.includes('already')) console.warn(`폴더 공유 경고 (${email}):`, e.message);
-      }
-    }
-
-    console.log('📂 서비스 계정 드라이브 폴더 준비 완료');
+    // 공유 폴더 ID가 이미 하드코딩되어 있으므로 별도 생성 불필요
+    console.log('📂 Drive 폴더 ID 설정 완료:', DRIVE_FOLDERS.receipts);
   } catch (e) {
     console.error('initDriveFolders 오류:', e.message);
   }
